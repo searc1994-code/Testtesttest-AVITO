@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Логи Avito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1360px; margin:0 auto; padding:20px; }
+    .bar,.panel { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar { padding:16px 18px; margin-bottom:16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .grid { display:grid; grid-template-columns:360px 1fr; gap:16px; }
+    .panel { padding:16px; }
+    .muted { color:#64748b; font-size:13px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #edf2f7; vertical-align:top; }
+    th { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.03em; }
+    .timeline { display:grid; gap:10px; }
+    .event { border-left:4px solid #cbd5e1; background:#f8fafc; padding:10px 12px; border-radius:10px; }
+    .event.info { border-left-color:#2563eb; }
+    .event.warning { border-left-color:#d97706; }
+    .event.error { border-left-color:#dc2626; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#e2e8f0; font-size:12px; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    select { border:1px solid #cbd5e1; border-radius:10px; padding:8px 10px; font:inherit; }
+    button { border:0; background:#2563eb; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; font:inherit; }
+    a { color:#1d4ed8; text-decoration:none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div style="font-size:22px;font-weight:700;">Логи Avito</div>
+      <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+      <div class="muted">Папка логов: <code>{{ avito_logs_root }}</code></div>
+    </div>
+    <div class="row">
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+      <a href="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}">DLQ</a>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="row">
+      <span class="pill">incoming 60m: {{ avito_metrics.incoming_60m }}</span>
+      <span class="pill">auto: {{ avito_metrics.auto_reply_share }}%</span>
+      <span class="pill">escalation: {{ avito_metrics.escalation_share }}%</span>
+      <span class="pill">refresh: {{ avito_metrics.token_refresh_events_60m }}</span>
+      <span class="pill">webhook fail 24h: {{ avito_metrics.webhook_verify_fail_pct_24h }}%</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">Последние run-логи</div>
+      {% if runs %}
+        <table>
+          <thead><tr><th>Run</th><th>Статус</th></tr></thead>
+          <tbody>
+          {% for run in runs %}
+            <tr>
+              <td>
+                <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id, run_id=run.run_id, channel=selected_channel) }}">{{ run.kind }}</a>
+                <div class="muted">{{ run.run_id }}</div>
+                <div class="muted">{{ run.updated_at or run.created_at }}</div>
+              </td>
+              <td>
+                <span class="pill {% if run.status == 'completed' %}ok{% elif run.status in ['warning', 'abandoned'] %}warn{% elif run.status == 'error' %}err{% endif %}">{{ run.status }}</span>
+                <div class="muted">{{ run.last_stage or '—' }}</div>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="muted">Run-логи пока не появились.</div>
+      {% endif %}
+    </div>
+
+    <div style="display:grid; gap:16px;">
+      <div class="panel">
+        <div style="font-weight:700;margin-bottom:12px;">Сводка по выбранному run</div>
+        {% if selected_run %}
+          <div class="row" style="margin-bottom:8px;">
+            <span class="pill {% if selected_run.status == 'completed' %}ok{% elif selected_run.status in ['warning', 'abandoned'] %}warn{% elif selected_run.status == 'error' %}err{% endif %}">{{ selected_run.status }}</span>
+            <strong>{{ selected_run.kind }}</strong>
+            <span class="muted">{{ selected_run.run_id }}</span>
+          </div>
+          <div class="muted">Создан: {{ selected_run.created_at or '—' }} · Завершён: {{ selected_run.finished_at or '—' }}</div>
+          <div class="muted">Последний шаг: {{ selected_run.last_stage or '—' }} · {{ selected_run.last_message or '—' }}</div>
+          {% if selected_run.summary %}
+            <pre style="white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:12px;overflow:auto;">{{ selected_run.summary | tojson(indent=2) }}</pre>
+          {% endif %}
+        {% else %}
+          <div class="muted">Выбери run слева, чтобы посмотреть подробности.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <div style="font-weight:700;margin-bottom:12px;">Таймлайн выбранного run</div>
+        {% if selected_run_events %}
+          <div class="timeline">
+            {% for event in selected_run_events %}
+              <div class="event {{ event.level or 'info' }}">
+                <div class="row">
+                  <strong>{{ event.stage }}</strong>
+                  {% if event.percent is defined %}<span class="pill">{{ event.percent }}%</span>{% endif %}
+                  <span class="muted">{{ event.ts }}</span>
+                  <span class="muted">{{ event.channel }}</span>
+                </div>
+                <div style="margin-top:6px; white-space:pre-wrap;">{{ event.message or '—' }}</div>
+                {% if event.data %}
+                  <pre style="white-space:pre-wrap;background:#f1f5f9;padding:10px;border-radius:10px;overflow:auto;margin-top:8px;">{{ event.data | tojson(indent=2) }}</pre>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">Для выбранного run нет событий.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <div style="font-weight:700;margin-bottom:12px;">Хвост channel-логов</div>
+        <form method="get" class="row" style="margin-bottom:12px;">
+          {% if selected_run.run_id %}<input type="hidden" name="run_id" value="{{ selected_run.run_id }}">{% endif %}
+          <label>Канал
+            <select name="channel">
+              {% for channel in available_channels %}
+                <option value="{{ channel }}" {% if channel == selected_channel %}selected{% endif %}>{{ channel }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Показать</button>
+        </form>
+        {% if channel_events %}
+          <div class="timeline">
+            {% for event in channel_events %}
+              <div class="event {{ event.level or 'info' }}">
+                <div class="row">
+                  <strong>{{ event.stage }}</strong>
+                  {% if event.run_id %}<span class="muted">run={{ event.run_id }}</span>{% endif %}
+                  <span class="muted">{{ event.ts }}</span>
+                </div>
+                <div style="margin-top:6px; white-space:pre-wrap;">{{ event.message or '—' }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">По каналу {{ selected_channel }} событий пока нет.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

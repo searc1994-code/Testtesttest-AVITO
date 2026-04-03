@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{{ page_title or 'Avito Inbox' }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1260px; margin:0 auto; padding:20px; }
+    .bar,.panel,.chat,.stat { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar { padding:16px 18px; margin-bottom:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+    .nav a { margin-right:12px; text-decoration:none; color:#334155; }
+    .grid { display:grid; grid-template-columns:320px 1fr; gap:16px; }
+    .panel { padding:16px; }
+    .stats { display:grid; grid-template-columns: repeat(8, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+    .stat { padding:14px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #edf2f7; vertical-align:top; }
+    th { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.03em; }
+    .pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:12px; background:#e2e8f0; color:#0f172a; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; }
+    .actions form { display:inline-flex; gap:8px; margin:0 8px 8px 0; align-items:center; flex-wrap:wrap; }
+    input[type='text'], input[type='number'], textarea, select { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
+    button { border:0; background:#2563eb; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font:inherit; }
+    button.secondary { background:#475569; }
+    button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
+    button.warn { background:#d97706; }
+    .muted { color:#64748b; font-size:13px; }
+    .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
+    .chatlink { text-decoration:none; color:inherit; display:block; }
+    .chatlist { display:grid; gap:10px; }
+    .chat { padding:14px; }
+    .jobs { margin:8px 0 0; padding-left:18px; }
+    code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div style="font-size:22px;font-weight:700;">Avito Inbox</div>
+      <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+      <div class="muted">Webhook-first / Polling-second / Migration-third</div>
+    </div>
+    <div class="nav">
+      <a href="{{ url_for('index', tenant_id=active_tenant_id) if 'index' in current_app.view_functions else '#' }}">Отзывы</a>
+      <a href="{{ url_for('questions', tenant_id=active_tenant_id) if 'questions' in current_app.view_functions else '#' }}">Вопросы</a>
+      <a href="{{ url_for('complaints', tenant_id=active_tenant_id) if 'complaints' in current_app.view_functions else '#' }}">Жалобы</a>
+      <a href="{{ url_for('automation', tenant_id=active_tenant_id) if 'automation' in current_app.view_functions else '#' }}">Автоматизация</a>
+      <a href="{{ url_for('diagnostics', tenant_id=active_tenant_id) if 'diagnostics' in current_app.view_functions else '#' }}">Диагностика</a>
+      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">HITL очередь</a>
+      <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки Avito</a>
+      <a href="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}">База знаний</a>
+      <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}">Медиа</a>
+      <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+      <a href="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}">DLQ</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="stats">
+    <div class="stat"><div class="muted">API настроен</div><div style="font-size:22px;font-weight:700;">{{ 'Да' if avito_config.configured else 'Нет' }}</div></div>
+    <div class="stat"><div class="muted">Incoming 5 / 15 / 60 мин</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.incoming_5m }} / {{ avito_metrics.incoming_15m }} / {{ avito_metrics.incoming_60m }}</div></div>
+    <div class="stat"><div class="muted">Auto / Escalation</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.auto_reply_share }}% / {{ avito_metrics.escalation_share }}%</div></div>
+    <div class="stat"><div class="muted">Webhook fail / lag</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.webhook_verify_fail_pct_24h }}% / {{ avito_metrics.webhook_process_lag_seconds_avg if avito_metrics.webhook_process_lag_seconds_avg is not none else '—' }}s</div></div>
+    <div class="stat"><div class="muted">Refresh / Fallback</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.token_refresh_events_60m }} / {{ avito_metrics.browser_fallback_share }}%</div></div>
+    <div class="stat"><div class="muted">KB / Media</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.knowledge_docs_active }} / {{ avito_metrics.media_assets_active }}</div></div>
+    <div class="stat"><div class="muted">Review / Hold</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.review_queue_count }} / {{ avito_metrics.hold_queue_count }}</div></div>
+    <div class="stat"><div class="muted">Ready / Error</div><div style="font-size:18px;font-weight:700;">{{ avito_metrics.approved_queue_count }} / {{ avito_metrics.error_queue_count }}</div></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="actions">
+      <form method="post" action="{{ url_for('avito_module.avito_sync', tenant_id=active_tenant_id) }}">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <input type="number" name="max_chats" value="20" min="1" max="200" style="width:90px;">
+        <label class="muted" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="unread_only" value="1" checked> unread only</label>
+        <button type="submit">Sync (poll)</button>
+      </form>
+      {% if avito_permissions.ai_rules %}
+      <form method="post" action="{{ url_for('avito_module.avito_generate_drafts', tenant_id=active_tenant_id) }}">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <input type="number" name="limit" value="20" min="1" max="200" style="width:90px;">
+        <button type="submit" class="secondary">Сделать черновики</button>
+      </form>
+      {% endif %}
+      {% if avito_permissions.bulk_send %}
+      <form method="post" action="{{ url_for('avito_module.avito_send_drafts', tenant_id=active_tenant_id) }}">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <input type="number" name="limit" value="20" min="1" max="200" style="width:90px;">
+        <label class="muted" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="auto_only" value="1"> только auto</label>
+        <button type="submit">Отправить готовые</button>
+      </form>
+      {% endif %}
+      {% if avito_permissions.admin %}
+      <form method="post" action="{{ url_for('avito_module.avito_backfill', tenant_id=active_tenant_id) }}">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <input type="number" name="max_chats" value="200" min="1" max="2000" style="width:100px;">
+        <input type="number" name="messages_per_chat" value="200" min="1" max="1000" style="width:120px;">
+        <button type="submit" class="warn">Backfill</button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}"><button type="button" class="ghost">HITL очередь</button></a>
+      <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}"><button type="button" class="ghost">Настройки / security / browser</button></a>
+      <a href="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}"><button type="button" class="ghost">База знаний</button></a>
+      <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}"><button type="button" class="ghost">Медиа</button></a>
+    </div>
+    <div class="muted">State-файл: <code>{{ avito_browser_state.path }}</code></div>
+    <div class="muted">Webhook URL: <code>{{ avito_webhook_url }}</code></div>
+    {% set jobs_feed = avito_jobs if avito_jobs else background_jobs_latest %}
+    {% if jobs_feed %}
+      <ul class="jobs">
+        {% for job in jobs_feed %}
+          <li><strong>{{ job.kind }}</strong> — {{ job.status }}{% if job.last_message %} · {{ job.last_message }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">Операционный обзор</div>
+      <div class="muted">Avg first response: {{ avito_metrics.avg_first_response_minutes if avito_metrics.avg_first_response_minutes is not none else '—' }} мин</div>
+      <div class="muted">Webhook events 24h: {{ avito_metrics.webhook_events_24h }}</div>
+      <div class="muted">Sync runs: {{ avito_metrics.sync_runs_considered }}</div>
+      <div class="muted">Review queue: {{ avito_metrics.review_queue_count }}</div>
+      <div class="muted">Hold queue: {{ avito_metrics.hold_queue_count }}</div>
+      <div class="muted">Ready queue: {{ avito_metrics.approved_queue_count }}</div>
+      <div class="muted">Error queue: {{ avito_metrics.error_queue_count }}</div>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0;">
+      <div style="font-weight:700;margin-bottom:10px;">Фильтры</div>
+      <form method="get" action="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <label>Статус
+          <select name="status">
+            {% for value in ['all', 'open', 'lead', 'waiting', 'closed'] %}
+              <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="unanswered" value="1" {% if unanswered_only %}checked{% endif %}> только чаты без исходящего ответа</label>
+        <button type="submit" class="ghost">Применить фильтр</button>
+      </form>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0;">
+      <div style="font-weight:700;margin-bottom:10px;">Последние DLQ</div>
+      {% for item in avito_recent_dlq %}
+        <div class="muted">#{{ item.dlq_id }} · {{ item.source_kind }} · {{ item.status }} · {{ item.error_text }}</div>
+      {% else %}
+        <div class="muted">DLQ-пусто.</div>
+      {% endfor %}
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">Чаты</div>
+      <div class="chatlist">
+        {% for chat in chats %}
+          <a class="chatlink" href="{{ url_for('avito_module.avito_chat', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}">
+            <div class="chat">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:700;">{{ chat.client_name or chat.title or chat.chat_id }}</div>
+                  <div class="muted">{{ chat.item_title or 'Без названия объявления' }}</div>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                  {% if chat.unread_count %}<span class="pill warn">unread {{ chat.unread_count }}</span>{% endif %}
+                  {% if chat.status %}<span class="pill">{{ chat.status }}</span>{% endif %}
+                  {% if chat.draft %}
+                    {% set draft_state = chat.draft.get('state') or 'draft' %}
+                    <span class="pill {% if draft_state == 'ready' %}ok{% elif draft_state in ['review','hold'] %}warn{% elif draft_state == 'error' %}err{% endif %}">draft {{ draft_state }}</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div style="margin-top:8px;white-space:pre-wrap;">{{ chat.last_message_text or '—' }}</div>
+              <div class="muted" style="margin-top:8px;">{{ chat.last_message_ts or '—' }}{% if chat.assigned_to %} · assigned: {{ chat.assigned_to }}{% endif %}</div>
+              {% if chat.draft %}
+                <div class="muted" style="margin-top:6px;">draft route={{ chat.draft.get('route') }} · confidence={{ chat.draft.get('confidence') }}</div>
+              {% endif %}
+            </div>
+          </a>
+        {% else %}
+          <div class="muted">Чаты пока не загружены. Запусти sync.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

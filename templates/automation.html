@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ночная автоматизация</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1700px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.nav { display:flex; gap:14px; flex-wrap:wrap; }
+.nav a { color:#2563eb; text-decoration:none; font-weight:700; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:16px; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+.muted { color:#6b7280; }
+.small { font-size:12px; color:#6b7280; }
+button, .button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e3a8a; }
+.btn-light { background:#f3f4f6; color:#111827; }
+.btn-danger { background:#7c2d12; color:#fff; }
+input[type="text"], input[type="time"], input[type="number"], select, textarea { width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; background:#fff; }
+label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+.table { width:100%; border-collapse:collapse; }
+.table th, .table td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+.table th { background:#fff; position:sticky; top:0; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+.badge-ok { background:#ecfdf5; color:#065f46; }
+.badge-bad { background:#fef2f2; color:#991b1b; }
+.badge-warn { background:#fff7ed; color:#9a3412; }
+.badge-run { background:#dbeafe; color:#1d4ed8; }
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.two-col { display:grid; grid-template-columns: 1.15fr 1fr; gap:16px; }
+.progress-block { border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-top:10px; }
+.progress-log { max-height:260px; overflow:auto; background:#0f172a; color:#e5e7eb; border-radius:12px; padding:12px; font-family: Consolas, monospace; font-size:12px; white-space:pre-wrap; }
+.section-title { margin:0 0 10px 0; }
+.code { background:#111827; color:#f9fafb; padding:2px 6px; border-radius:6px; font-family:Consolas, monospace; }
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+@media (max-width: 1180px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+  {% endif %}
+
+  <div class="header">
+    <div>
+      <h1 style="margin:0 0 8px 0;">Ночная автоматизация</h1>
+      <div class="muted">Контур под вашу схему: в 23:00 контроль будущих акций, в 01:00 подготовка файлов цен по юрлицам. Пока это безопасный фундамент: планировщик, рабочая папка, отчёты, API-скан календаря акций и сборщик файлов цен.</div>
+    </div>
+    <div class="nav">
+      <a href="/{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">К ответам</a>
+      <a href="/complaints{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Жалобы</a>
+      <a href="/questions{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Вопросы</a>
+      <a href="/analytics{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Аналитика</a>
+      {% if avito_module_enabled %}<a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %}
+      <a href="/diagnostics{% if active_tenant_id %}?tenant={{ active_tenant_id }}{% endif %}">Диагностика / Логи</a>
+      {% if app_auth_enabled and current_user %}<a href="/logout">Выход ({{ current_user }})</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><b>Планировщик</b><br>{% if scheduler.runtime.enabled %}включён{% else %}выключен{% endif %}</div>
+    <div class="card"><b>Поток scheduler</b><br>{% if scheduler.runtime.thread_alive %}работает{% else %}не запущен{% endif %}</div>
+    <div class="card"><b>Следующий promo-run</b><br><span class="small">{{ next_runs.promo or '—' }}</span></div>
+    <div class="card"><b>Следующий prices-run</b><br><span class="small">{{ next_runs.prices or '—' }}</span></div>
+    <div class="card"><b>Рабочая папка</b><br><span class="small">{{ manifest.workspace_dir }}</span></div>
+    <div class="card"><b>Master-файл</b><br>{% if manifest.master_exists %}<span class="badge badge-ok">найден</span>{% else %}<span class="badge badge-bad">не найден</span>{% endif %}<div class="small">{{ manifest.master_filename }}</div></div>
+    <div class="card"><b>Шаблоны юрлиц</b><br>{% if workspace_health.templates_missing %}<span class="badge badge-bad">не все на месте</span>{% else %}<span class="badge badge-ok">все на месте</span>{% endif %}</div>
+    <div class="card"><b>Последний tick scheduler</b><br><span class="small">{{ scheduler.state.last_tick_at or '—' }}</span></div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="two-col">
+    <div class="card">
+      <h3 class="section-title">Ручной запуск</h3>
+      <div class="small" style="margin-bottom:10px;">Можно запускать весь контур по всем кабинетам или только по выбранным. Доступны отдельные этапы: скан и снятие будущих акций, подготовка файлов цен и загрузка цен через ЛК с последующей API-проверкой.</div>
+      <form id="manual-actions-form" class="form-grid">
+        <label>Область запуска
+          <select name="tenant_scope" id="manual-tenant-scope">
+            <option value="all">Все включённые кабинеты</option>
+            <option value="selected">Только отмеченные ниже</option>
+          </select>
+        </label>
+        <div></div>
+        <div style="grid-column:1/-1;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width:40px;"></th>
+                <th>Кабинет</th>
+                <th>Promo</th>
+                <th>Prices</th>
+                <th>Шаблон цен</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in manifest.tenants %}
+              {% set tenant_cfg = settings.tenants.get(row.tenant_id, {}) %}
+              <tr>
+                <td><input type="checkbox" name="tenant_ids" value="{{ row.tenant_id }}"></td>
+                <td><b>{{ row.tenant_name }}</b><div class="small code">{{ row.tenant_id }}</div></td>
+                <td>{% if tenant_cfg.promo_enabled %}<span class="badge badge-ok">включён</span>{% else %}<span class="badge badge-bad">выключен</span>{% endif %}</td>
+                <td>{% if tenant_cfg.price_enabled %}<span class="badge badge-ok">включён</span>{% else %}<span class="badge badge-bad">выключен</span>{% endif %}</td>
+                <td><span class="small">{{ row.template_filename }}</span>{% if row.template_exists %}<span class="badge badge-ok">есть</span>{% else %}<span class="badge badge-bad">нет</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="toolbar" style="grid-column:1/-1; margin-top:10px;">
+          <button type="button" class="btn-secondary" id="run-promo-scan">Скан будущих акций</button>
+          <button type="button" class="btn-primary" id="run-promo-execute">Снять будущие акции</button>
+          <button type="button" class="btn-secondary" id="run-price-build">Подготовить файлы цен</button>
+          <button type="button" class="btn-primary" id="run-price-upload">Загрузить цены в WB</button>
+        </div>
+      </form>
+      <form id="promo-scan-form" method="post" action="/automation/promo/scan" style="display:none;"></form>
+      <form id="promo-execute-form" method="post" action="/automation/promo/execute" style="display:none;"></form>
+      <form id="price-build-form" method="post" action="/automation/prices/build" style="display:none;"></form>
+      <form id="price-upload-form" method="post" action="/automation/prices/upload" style="display:none;"></form>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Состояние scheduler</h3>
+      <div style="margin-bottom:8px;">Статус: 
+        {% if scheduler.state.status == 'running' %}<span class="badge badge-run">running</span>
+        {% elif scheduler.state.status == 'error' %}<span class="badge badge-bad">error</span>
+        {% elif scheduler.state.status == 'disabled' %}<span class="badge badge-warn">disabled</span>
+        {% else %}<span class="badge">{{ scheduler.state.status or 'idle' }}</span>{% endif %}
+      </div>
+      <div class="small">Started at: {{ scheduler.state.started_at or '—' }}</div>
+      <div class="small">Last tick: {{ scheduler.state.last_tick_at or '—' }}</div>
+      {% if scheduler.state.last_error %}<div class="flash flash-error" style="margin-top:10px;">{{ scheduler.state.last_error }}</div>{% endif %}
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0;">
+      <div><b>Последние планы</b></div>
+      <div style="display:grid; gap:8px; margin-top:10px;">
+        {% for plan_key, plan in scheduler.plans.items() %}
+        <div class="progress-block">
+          <div><span class="badge">{{ plan_key }}</span> <b>{{ plan.last_status or '—' }}</b></div>
+          <div class="small">Запуск: {{ plan.last_started_at or '—' }}</div>
+          <div class="small">Завершение: {{ plan.last_finished_at or '—' }}</div>
+          <div class="small">Job ID: {{ plan.last_job_id or '—' }}</div>
+          {% if plan.last_report_path %}<div class="small"><a href="{{ url_for('automation_download', path=plan.last_report_path) }}">Скачать последний report</a></div>{% endif %}
+        </div>
+        {% else %}
+        <div class="small muted">Планов пока нет.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 class="section-title">Настройки</h3>
+    <form method="post" action="/automation/settings">
+      <div class="form-grid">
+        <label><span>Часовой пояс</span>
+          <input type="text" name="timezone" value="{{ settings.timezone }}" placeholder="Europe/Moscow" disabled>
+        </label>
+        <label style="justify-content:flex-end;">
+          <span>Глобальное расписание</span>
+          <span><input type="checkbox" name="schedule_enabled" value="1" {% if settings.schedule_enabled %}checked{% endif %}> включить</span>
+        </label>
+        <label style="justify-content:flex-end;">
+          <span>Архивировать каждый запуск</span>
+          <span><input type="checkbox" name="archive_runs" value="1" {% if settings.archive_runs %}checked{% endif %}> сохранять zip/отчёты</span>
+        </label>
+      </div>
+
+      <div class="two-col" style="margin-top:16px;">
+        <div class="progress-block">
+          <h4 style="margin:0 0 10px 0;">Блок календаря акций</h4>
+          <div class="form-grid">
+            <label style="justify-content:flex-end;"><span>Включить блок</span><span><input type="checkbox" name="promo_enabled" value="1" {% if settings.promo.enabled %}checked{% endif %}></span></label>
+            <label>Режим
+              <select name="promo_mode">
+                <option value="manual" {% if settings.promo.mode == 'manual' %}selected{% endif %}>полуавтомат / вручную</option>
+                <option value="auto" {% if settings.promo.mode == 'auto' %}selected{% endif %}>авто по расписанию</option>
+              </select>
+            </label>
+            <label>Время запуска
+              <input type="time" name="promo_schedule_time" value="{{ settings.promo.schedule_time }}">
+            </label>
+            <label>Горизонт, дней
+              <input type="number" name="promo_window_days" min="1" max="30" value="{{ settings.promo.window_days }}">
+            </label>
+            <label style="justify-content:flex-end;"><span>Только будущие</span><span><input type="checkbox" name="promo_future_only" value="1" {% if settings.promo.future_only %}checked{% endif %}></span></label>
+            <label style="justify-content:flex-end;"><span>Смотреть все промо</span><span><input type="checkbox" name="promo_all_promotions" value="1" {% if settings.promo.all_promotions %}checked{% endif %}></span></label>
+            <label style="justify-content:flex-end;"><span>Включать auto</span><span><input type="checkbox" name="promo_include_auto" value="1" {% if settings.promo.include_auto %}checked{% endif %}></span></label>
+            <label style="justify-content:flex-end;"><span>Включать regular</span><span><input type="checkbox" name="promo_include_regular" value="1" {% if settings.promo.include_regular %}checked{% endif %}></span></label>
+            <label>Retry count
+              <input type="number" name="promo_max_retries" min="1" max="10" value="{{ settings.promo.max_retries }}">
+            </label>
+            <label>Стратегия
+              <select name="promo_strategy">
+                <option value="api_then_browser" {% if settings.promo.strategy == 'api_then_browser' %}selected{% endif %}>сначала API, потом браузер</option>
+                <option value="browser_only" {% if settings.promo.strategy == 'browser_only' %}selected{% endif %}>только браузер</option>
+              </select>
+            </label>
+            <label style="justify-content:flex-end;"><span>Проверять после действия</span><span><input type="checkbox" name="promo_verify_after_action" value="1" {% if settings.promo.verify_after_action %}checked{% endif %}></span></label>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <h4 style="margin:0 0 10px 0;">Блок цен</h4>
+          <div class="form-grid">
+            <label style="justify-content:flex-end;"><span>Включить блок</span><span><input type="checkbox" name="prices_enabled" value="1" {% if settings.prices.enabled %}checked{% endif %}></span></label>
+            <label>Режим
+              <select name="prices_mode">
+                <option value="manual" {% if settings.prices.mode == 'manual' %}selected{% endif %}>полуавтомат / вручную</option>
+                <option value="auto" {% if settings.prices.mode == 'auto' %}selected{% endif %}>авто по расписанию</option>
+              </select>
+            </label>
+            <label>Время запуска
+              <input type="time" name="prices_schedule_time" value="{{ settings.prices.schedule_time }}">
+            </label>
+            <label>Master-файл
+              <input type="text" name="master_filename" value="{{ settings.prices.master_filename }}">
+            </label>
+            <label>Лист master
+              <input type="text" name="master_sheet_name" value="{{ settings.prices.master_sheet_name }}" placeholder="первый лист по умолчанию">
+            </label>
+            <label>Лист шаблона
+              <input type="text" name="template_sheet_name" value="{{ settings.prices.template_sheet_name }}" placeholder="первый лист по умолчанию">
+            </label>
+            <label>Шаблон имени файла юрлица
+              <input type="text" name="template_pattern" value="{{ settings.prices.template_pattern }}">
+            </label>
+            <label>Шаблон выходного файла
+              <input type="text" name="output_pattern" value="{{ settings.prices.output_pattern }}">
+            </label>
+            <label>Предупреждать при изменении > %
+              <input type="number" step="0.1" min="0" max="500" name="warn_change_pct" value="{{ settings.prices.warn_change_pct }}">
+            </label>
+            <label>Стартовая строка
+              <input type="number" min="1" max="1000" name="row_start" value="{{ settings.prices.row_start }}">
+            </label>
+            <label>Колонка артикула в master
+              <input type="text" name="master_article_col" value="{{ settings.prices.master_article_col }}">
+            </label>
+            <label>Колонка цены в master
+              <input type="text" name="master_price_col" value="{{ settings.prices.master_price_col }}">
+            </label>
+            <label>Колонка скидки в master
+              <input type="text" name="master_discount_col" value="{{ settings.prices.master_discount_col }}">
+            </label>
+            <label>Колонка артикула в шаблоне
+              <input type="text" name="template_article_col" value="{{ settings.prices.template_article_col }}">
+            </label>
+            <label>Колонка цены в шаблоне
+              <input type="text" name="template_price_col" value="{{ settings.prices.template_price_col }}">
+            </label>
+            <label>Колонка скидки в шаблоне
+              <input type="text" name="template_discount_col" value="{{ settings.prices.template_discount_col }}">
+            </label>
+            <label>Пересчёт master
+              <select name="recalc_mode">
+                <option value="auto" {% if settings.prices.recalc_mode == 'auto' %}selected{% endif %}>авто</option>
+                <option value="windows_excel" {% if settings.prices.recalc_mode == 'windows_excel' %}selected{% endif %}>только через Excel COM</option>
+                <option value="cached" {% if settings.prices.recalc_mode == 'cached' %}selected{% endif %}>только сохранённые значения</option>
+              </select>
+            </label>
+            <label style="justify-content:flex-end;"><span>Проверять итог через API</span><span><input type="checkbox" name="verify_via_api" value="1" {% if settings.prices.verify_via_api %}checked{% endif %}></span></label>
+            <label style="justify-content:flex-end;"><span>Загружать через браузерный ЛК</span><span><input type="checkbox" name="upload_via_browser" value="1" {% if settings.prices.upload_via_browser %}checked{% endif %}></span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="progress-block" style="margin-top:16px;">
+        <h4 style="margin:0 0 10px 0;">Кабинеты и шаблоны</h4>
+        <div class="small" style="margin-bottom:8px;">{{ manifest.rename_hint }}</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Кабинет</th>
+              <th>Участвует</th>
+              <th>Promo</th>
+              <th>Prices</th>
+              <th>Ожидаемое имя шаблона</th>
+              <th>Файл найден</th>
+              <th>Примечание</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in manifest.tenants %}
+            {% set tenant_cfg = settings.tenants.get(row.tenant_id, {}) %}
+            <tr>
+              <td><b>{{ row.tenant_name }}</b><div class="small code">{{ row.tenant_id }}</div></td>
+              <td><input type="checkbox" name="tenant__{{ row.tenant_id }}__enabled" value="1" {% if tenant_cfg.enabled %}checked{% endif %}></td>
+              <td><input type="checkbox" name="tenant__{{ row.tenant_id }}__promo_enabled" value="1" {% if tenant_cfg.promo_enabled %}checked{% endif %}></td>
+              <td><input type="checkbox" name="tenant__{{ row.tenant_id }}__price_enabled" value="1" {% if tenant_cfg.price_enabled %}checked{% endif %}></td>
+              <td><input type="text" name="tenant__{{ row.tenant_id }}__template_filename" value="{{ tenant_cfg.template_filename or row.template_filename }}"></td>
+              <td>{% if row.template_exists %}<span class="badge badge-ok">да</span>{% else %}<span class="badge badge-bad">нет</span>{% endif %}</td>
+              <td><input type="text" name="tenant__{{ row.tenant_id }}__notes" value="{{ tenant_cfg.notes or '' }}" placeholder="любая подсказка для себя"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="toolbar" style="margin-top:16px;">
+        <button class="btn-primary" type="submit">Сохранить настройки автоматизации</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="two-col" style="margin-top:16px;">
+    <div class="card">
+      <h3 class="section-title">Рабочая папка и здоровье контура</h3>
+      <div class="small">Рабочая папка: <span class="code">{{ manifest.workspace_dir }}</span></div>
+      <div class="small" style="margin-top:6px;">Рекомендуемое имя master-файла: <span class="code">{{ manifest.master_filename }}</span></div>
+      {% if workspace_health.ok %}
+        <div style="margin-top:10px;"><span class="badge badge-ok">Рабочая папка готова</span></div>
+      {% else %}
+        <div style="margin-top:10px;"><span class="badge badge-bad">Есть блокирующие проблемы</span></div>
+      {% endif %}
+      {% if workspace_health.templates_missing %}
+        <div class="small" style="margin-top:10px;">Не хватает шаблонов: {{ workspace_health.templates_missing|join(', ') }}</div>
+      {% endif %}
+      <div style="margin-top:12px; max-height:320px; overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Файл</th><th>Размер</th><th>Изменён</th></tr></thead>
+          <tbody>
+            {% for row in manifest.files %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.size }}</td>
+              <td>{{ row.modified_at }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="small muted">В рабочей папке пока нет файлов.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">Системные фоновые задачи</h3>
+      <div class="small">Эти задачи выполняются вне конкретного кабинета и отвечают за ночной контур.</div>
+      <div id="system-jobs" style="display:grid; gap:10px; margin-top:12px;">
+        {% for job in system_jobs %}
+        <div class="progress-block" data-job-id="{{ job.job_id }}">
+          <div><span class="badge">{{ job.kind }}</span> <b>{{ job.label }}</b></div>
+          <div class="small">Job ID: {{ job.job_id }} · {{ job.status }} · {{ job.updated_at or job.created_at }}</div>
+          <div class="small" style="margin-top:6px;">{{ job.last_message or '—' }}</div>
+          {% if job.progress and job.progress.percent is defined %}
+          <div class="small" style="margin-top:6px;">Прогресс: {{ job.progress.percent }}%</div>
+          {% endif %}
+          <details style="margin-top:8px;">
+            <summary>Детальный прогресс</summary>
+            <div class="progress-log">
+{% for row in job.progress_log or [] -%}
+{{ row.ts }} · {{ row.stage }}{% if row.percent is defined %} · {{ row.percent }}%{% endif %}{% if row.message %} · {{ row.message }}{% endif %}
+{% endfor -%}
+            </div>
+          </details>
+          {% if job.error %}<div class="flash flash-error" style="margin-top:8px;">{{ job.error }}</div>{% endif %}
+        </div>
+        {% else %}
+        <div class="small muted">Системных фоновых задач пока нет.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 class="section-title">Последние отчёты</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Тип</th>
+          <th>Статус</th>
+          <th>Кратко</th>
+          <th>Скачать</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in reports %}
+        <tr>
+          <td>{{ row.created_at }}</td>
+          <td>{{ row.kind }}</td>
+          <td>
+            {% if row.status == 'completed' %}<span class="badge badge-ok">completed</span>
+            {% elif row.status == 'partial' %}<span class="badge badge-warn">partial</span>
+            {% else %}<span class="badge badge-bad">{{ row.status }}</span>{% endif %}
+          </td>
+          <td>
+            <b>{{ row.title or '—' }}</b>
+            <div class="small">
+              {% if row.kind == 'prices_build' %}
+                подготовлено: {{ row.prepared }} · ошибок: {{ row.failed }}
+              {% elif row.kind == 'prices_upload' %}
+                загружено: {{ row.uploaded or 0 }} · ошибок: {{ row.failed }} · несовпадений: {{ row.mismatched_total or 0 }} · карантин: {{ row.quarantine_total or 0 }}
+              {% elif row.kind == 'promo_scan' %}
+                найдено к действию: {{ row.actionable_total }} · новых: {{ row.new_total }}
+              {% elif row.kind == 'promo_execute' %}
+                снято через браузер: {{ row.browser_success_total or 0 }} · ошибок: {{ row.browser_failed_total or 0 }} · осталось после проверки: {{ row.remaining_actionable_total or 0 }}
+              {% else %}
+                tenant: {{ row.tenant_id or '—' }}
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <div class="toolbar">
+              <a class="button-link btn-light" href="{{ url_for('automation_download', path=row.report_path) }}">report</a>
+              {% if row.archive_path %}<a class="button-link btn-light" href="{{ url_for('automation_download', path=row.archive_path) }}">archive</a>{% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="small muted">Отчётов пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function collectManualSelection(targetFormId) {
+  const source = document.getElementById('manual-actions-form');
+  const target = document.getElementById(targetFormId);
+  target.innerHTML = '';
+  const scopeInput = document.createElement('input');
+  scopeInput.type = 'hidden';
+  scopeInput.name = 'tenant_scope';
+  scopeInput.value = document.getElementById('manual-tenant-scope').value;
+  target.appendChild(scopeInput);
+  source.querySelectorAll('input[name="tenant_ids"]:checked').forEach((node) => {
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'tenant_ids';
+    hidden.value = node.value;
+    target.appendChild(hidden);
+  });
+}
+
+document.getElementById('run-promo-scan').addEventListener('click', () => {
+  collectManualSelection('promo-scan-form');
+  document.getElementById('promo-scan-form').submit();
+});
+
+document.getElementById('run-promo-execute').addEventListener('click', () => {
+  collectManualSelection('promo-execute-form');
+  document.getElementById('promo-execute-form').submit();
+});
+
+document.getElementById('run-price-build').addEventListener('click', () => {
+  collectManualSelection('price-build-form');
+  document.getElementById('price-build-form').submit();
+});
+
+document.getElementById('run-price-upload').addEventListener('click', () => {
+  collectManualSelection('price-upload-form');
+  document.getElementById('price-upload-form').submit();
+});
+
+async function refreshSystemJobs() {
+  try {
+    const response = await fetch('/jobs/status?tenant_id=_system&limit=10', {cache: 'no-store'});
+    const payload = await response.json();
+    if (!payload || !Array.isArray(payload.jobs)) return;
+    const container = document.getElementById('system-jobs');
+    container.innerHTML = '';
+    if (!payload.jobs.length) {
+      const empty = document.createElement('div');
+      empty.className = 'small muted';
+      empty.textContent = 'Системных фоновых задач пока нет.';
+      container.appendChild(empty);
+      return;
+    }
+    for (const job of payload.jobs) {
+      const block = document.createElement('div');
+      block.className = 'progress-block';
+      const lines = (job.progress_log || []).map((row) => `${row.ts || ''} · ${row.stage || ''}${row.percent !== undefined ? ' · ' + row.percent + '%' : ''}${row.message ? ' · ' + row.message : ''}`).join('\n');
+      block.innerHTML = `
+        <div><span class="badge">${job.kind || ''}</span> <b>${job.label || ''}</b></div>
+        <div class="small">Job ID: ${job.job_id || ''} · ${job.status || ''} · ${job.updated_at || job.created_at || ''}</div>
+        <div class="small" style="margin-top:6px;">${job.last_message || '—'}</div>
+        <div class="small" style="margin-top:6px;">Прогресс: ${job.progress && job.progress.percent !== undefined ? job.progress.percent + '%' : '—'}</div>
+        <details style="margin-top:8px;"><summary>Детальный прогресс</summary><div class="progress-log">${lines || 'пока пусто'}</div></details>
+        ${job.error ? `<div class="flash flash-error" style="margin-top:8px;">${job.error}</div>` : ''}
+      `;
+      container.appendChild(block);
+    }
+  } catch (err) {
+    // молча пропускаем: страница остаётся работоспособной даже без live-refresh
+  }
+}
+setInterval(refreshSystemJobs, 5000);
+</script>
+</body>
+</html>

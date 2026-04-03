@@ -1,0 +1,1 @@
+Вариант 3: keyboard/JS hard fallback. Использует клавиатурное открытие меню и DOM click/pointer sequence, если обычные клики блокируются overlay.

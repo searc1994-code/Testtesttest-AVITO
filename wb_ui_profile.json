@@ -1,0 +1,69 @@
+{
+  "search_urls": [
+    "https://seller.wildberries.ru/feedbacks/feedbacks-tab/not-answered?feedbacks-module_searchValue={search_value}&feedbacks-module_createdPeriod={created_period}&feedbacks-module_valuations={valuation}&feedbacks-module_content={content}",
+    "https://seller.wildberries.ru/feedbacks/feedbacks-tab/answered?feedbacks-module_searchValue={search_value}&feedbacks-module_createdPeriod={created_period}&feedbacks-module_valuations={valuation}&feedbacks-module_content={content}"
+  ],
+  "complaint_menu_texts": [
+    "Пожаловаться на отзыв",
+    "Пожаловаться"
+  ],
+  "submit_button_texts": [
+    "Отправить"
+  ],
+  "success_hints": [
+    "Жалоба отправлена",
+    "Спасибо, мы рассмотрим",
+    "отправлена",
+    "принята",
+    "Мои жалобы"
+  ],
+  "overlay_close_texts": [
+    "Закрыть",
+    "Понятно",
+    "Понял",
+    "×"
+  ],
+  "automation_prices": {
+    "open_upload_container_selectors": [
+      "div[class*='xlsx-actions']"
+    ],
+    "dropdown_list_selectors": [
+      "[data-testid='xlsx-action-options-test-id-dropdown-list']",
+      "ul[data-testid='xlsx-action-options-test-id-dropdown-list']",
+      "ul[class*='Dropdown-list']"
+    ],
+    "dropdown_option_selectors": [
+      "[data-testid='xlsx-action-options-test-id-dropdown-option']",
+      "button[class*='Dropdown-option']"
+    ],
+    "dropdown_option_texts": [
+      "Цены по размерам"
+    ],
+    "dropdown_fallback_option_texts": [
+      "Цены и скидки",
+      "Скидки для WB Клуба",
+      "Минимальные цены и блокировки для автоакций"
+    ],
+    "smart_open_testid_fragments": [
+      "xlsx-action-open",
+      "open-test-id-button"
+    ],
+    "smart_open_class_fragments": [
+      "xlsx-actions",
+      "button__",
+      "caption__"
+    ],
+    "smart_dropdown_testid_fragments": [
+      "dropdown-option",
+      "xlsx-action-options"
+    ],
+    "smart_submit_testid_fragments": [
+      "action-test-id-button-primary",
+      "button-primary"
+    ],
+    "smart_submit_class_fragments": [
+      "button__",
+      "caption__"
+    ]
+  }
+}

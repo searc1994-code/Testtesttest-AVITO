@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Результативность жалоб</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1600px; margin:0 auto; padding:24px; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:16px; margin-bottom:16px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+.badge { display:inline-block; background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+a { color:#2563eb; text-decoration:none; font-weight:700; }
+table { width:100%; border-collapse:collapse; }
+th, td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+{% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+{% endif %}
+<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+  <div><h1 style="margin:0 0 8px 0;">Результативность жалоб</h1><div style="color:#6b7280;">Статистика по уже отправленным жалобам: accepted / rejected / pending, категории и товары.</div></div>
+  <div><a href="/complaints{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">К жалобам</a> · <a href="/{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">К ответам</a> · <a href="/questions{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Вопросы</a>{% if avito_module_enabled %} · <a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %} · <a href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a>{% if app_auth_enabled and current_user %} · <a href="/logout">Выход ({{ current_user }})</a>{% endif %}</div>
+</div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="card">
+    {% for category, message in messages %}
+      <div style="padding:10px 12px; border-radius:10px; margin-top:8px; background:{% if category == 'error' %}#fef2f2; color:#991b1b;{% elif category == 'success' %}#ecfdf5; color:#065f46;{% else %}#eff6ff; color:#1d4ed8;{% endif %}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+<div class="card">
+  <form method="post" action="/complaints/effectiveness/refresh" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
+    <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+    <label><div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Сколько жалоб проверить</div><input type="number" name="max_items" value="0" min="0" style="padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; width:160px;"></label>
+    <div style="font-size:12px; color:#6b7280;">0 = проверить все отправленные жалобы этого кабинета. Запускайте вручную по кнопке, например раз в месяц.</div>
+    <button type="submit" style="background:#2563eb; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer;">Обновить статусы из WB</button>
+  </form>
+</div>
+{% if background_jobs_latest %}
+<div class="card">
+  <b>Фоновые задачи</b>
+  {% for job in background_jobs_latest %}<div style="font-size:12px; color:#6b7280; margin-top:6px;"><span class="badge">{{ job.kind }}</span> {{ job.label }} — {{ job.status }}{% if job.error %} · {{ job.error }}{% elif job.last_message %} · {{ job.last_message }}{% endif %}</div>{% endfor %}
+</div>
+{% endif %}
+<div class="grid">
+  <div class="card"><b>Жалоб отправлено</b><br>{{ stats.total_sent }}</div>
+  <div class="card"><b>accepted</b><br>{{ stats.accepted }}</div>
+  <div class="card"><b>rejected</b><br>{{ stats.rejected }}</div>
+  <div class="card"><b>pending</b><br>{{ stats.pending }}</div>
+</div>
+<div class="card">
+  <h3 style="margin-top:0;">Какие категории работают лучше</h3>
+  {% if stats.category_rows %}
+  <table>
+    <thead><tr><th>Категория</th><th>Отправлено</th><th>accepted</th><th>rejected</th><th>pending</th><th>% accepted</th></tr></thead>
+    <tbody>
+      {% for row in stats.category_rows %}
+      <tr><td>{{ row.category }}</td><td>{{ row.total }}</td><td>{{ row.accepted }}</td><td>{{ row.rejected }}</td><td>{{ row.pending }}</td><td>{{ row.accept_rate }}%</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div style="color:#6b7280;">Данных пока нет.</div>{% endif %}
+</div>
+<div class="card">
+  <h3 style="margin-top:0;">По каким товарам чаще принимают жалобы</h3>
+  {% if stats.product_rows %}
+  <table>
+    <thead><tr><th>Товар</th><th>nmID</th><th>Отправлено</th><th>accepted</th><th>rejected</th><th>pending</th><th>% accepted</th></tr></thead>
+    <tbody>
+      {% for row in stats.product_rows %}
+      <tr><td>{{ row.product_name }}</td><td>{{ row.nm_id }}</td><td>{{ row.total }}</td><td>{{ row.accepted }}</td><td>{{ row.rejected }}</td><td>{{ row.pending }}</td><td>{{ row.accept_rate }}%</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div style="color:#6b7280;">Данных пока нет.</div>{% endif %}
+</div>
+<div class="card">
+  <h3 style="margin-top:0;">Последние изменения статусов</h3>
+  {% if stats.recent %}
+  <table>
+    <thead><tr><th>Дата</th><th>Товар</th><th>Категория</th><th>Статус</th><th>Причина</th></tr></thead>
+    <tbody>
+      {% for row in stats.recent %}
+      <tr><td>{{ row.processed_at }}</td><td>{{ row.product_name }}</td><td>{{ row.category }}</td><td>{{ row.outcome }}</td><td>{{ row.reason }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div style="color:#6b7280;">Данных пока нет.</div>{% endif %}
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const tenantId = {{ active_tenant_id|tojson }};
+  if(!tenantId) return;
+  document.querySelectorAll('form').forEach(function(form){
+    if(form.querySelector('input[name="tenant_id"]')) return;
+    const input=document.createElement('input');
+    input.type='hidden'; input.name='tenant_id'; input.value=tenantId;
+    form.appendChild(input);
+  });
+  document.querySelectorAll('a[href]').forEach(function(a){
+    const href=a.getAttribute('href');
+    if(!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+    if(href.includes('tenant_id=')) return;
+    try{
+      const url = new URL(href, window.location.origin);
+      if(url.origin !== window.location.origin) return;
+      url.searchParams.set('tenant_id', tenantId);
+      a.setAttribute('href', url.pathname + url.search + url.hash);
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>

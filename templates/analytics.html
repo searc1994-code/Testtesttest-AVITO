@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Аналитика</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1400px; margin:0 auto; padding:24px; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:16px; margin-bottom:16px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.badge { display:inline-block; background:#eef2ff; color:#1e3a8a; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+a { color:#2563eb; text-decoration:none; font-weight:700; }
+table { width:100%; border-collapse:collapse; }
+th, td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+  {% endif %}
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <div>
+      <h1 style="margin:0 0 8px 0;">Аналитика</h1>
+      <div style="color:#6b7280;">Краткая статистика по уже отправленным ответам.</div>
+    </div>
+    <div><a href="/">К ответам</a> · <a href="/complaints">К жалобам</a> · <a href="/questions">Вопросы</a>{% if avito_module_enabled %} · <a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %} · <a href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a> · <a href="/diagnostics">Диагностика / Логи</a>{% if app_auth_enabled and current_user %} · <a href="/logout">Выход ({{ current_user }})</a>{% endif %}</div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><b>Отправлено ответов</b><br>{{ stats.total_sent }}</div>
+    <div class="card"><b>Средняя оценка</b><br>{{ stats.avg_stars }}</div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Распределение по звёздам</h3>
+    {% if stats.stars %}
+      {% for star, count in stats.stars.items() %}<span class="badge">{{ star }}★ — {{ count }}</span>{% endfor %}
+    {% else %}
+      <div style="color:#6b7280;">Данных пока нет.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Топ товаров</h3>
+    {% if stats.top_products %}
+    <table>
+      <thead><tr><th>Товар</th><th>Количество</th></tr></thead>
+      <tbody>
+        {% for name, cnt in stats.top_products %}
+        <tr><td>{{ name }}</td><td>{{ cnt }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="color:#6b7280;">Данных пока нет.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Последние отправленные ответы</h3>
+    {% if stats.recent %}
+    <table>
+      <thead><tr><th>Товар</th><th>Оценка</th><th>Отзыв</th><th>Ответ</th><th>Дата отправки</th></tr></thead>
+      <tbody>
+        {% for item in stats.recent %}
+        <tr>
+          <td>{{ item.product_name }}</td>
+          <td>{{ item.stars }}</td>
+          <td>{{ item.review_text }}</td>
+          <td>{{ item.reply }}</td>
+          <td>{{ item.sent_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="color:#6b7280;">Данных пока нет.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const tenantId = {{ active_tenant_id|tojson }};
+  if(!tenantId) return;
+  document.querySelectorAll('form').forEach(function(form){
+    if(form.querySelector('input[name="tenant_id"]')) return;
+    const input=document.createElement('input');
+    input.type='hidden'; input.name='tenant_id'; input.value=tenantId;
+    form.appendChild(input);
+  });
+  document.querySelectorAll('a[href]').forEach(function(a){
+    const href=a.getAttribute('href');
+    if(!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+    if(href.includes('tenant_id=')) return;
+    try{
+      const url = new URL(href, window.location.origin);
+      if(url.origin !== window.location.origin) return;
+      url.searchParams.set('tenant_id', tenantId);
+      a.setAttribute('href', url.pathname + url.search + url.hash);
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>

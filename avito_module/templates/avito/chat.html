@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Чат Avito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1380px; margin:0 auto; padding:20px; }
+    .bar,.panel,.msg,.card { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar { padding:16px 18px; margin-bottom:16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .grid { display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; }
+    .panel,.card { padding:16px; }
+    .stack { display:grid; gap:12px; }
+    .msg { padding:12px 14px; }
+    .msg.in { border-left:4px solid #2563eb; }
+    .msg.out { border-left:4px solid #16a34a; }
+    .muted { color:#64748b; font-size:13px; }
+    input, textarea, select { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
+    button { border:0; background:#2563eb; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font:inherit; }
+    button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
+    button.warn { background:#d97706; }
+    button.err { background:#b91c1c; }
+    pre { white-space:pre-wrap; background:#0f172a; color:#e2e8f0; padding:12px; border-radius:12px; overflow:auto; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .hit, .asset, .sample { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-top:10px; }
+    img.preview, video.preview { max-width:160px; max-height:140px; border-radius:10px; border:1px solid #e2e8f0; }
+    .pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:12px; background:#e2e8f0; color:#0f172a; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div style="font-size:22px;font-weight:700;">{{ chat.client_name or chat.title or chat.chat_id }}</div>
+      <div class="muted">{{ chat.item_title or 'Без названия объявления' }} · status={{ chat.status }} · priority={{ chat.priority }}</div>
+    </div>
+    <div class="row">
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">HITL очередь</a>
+      <a href="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}">База знаний</a>
+      <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}">Медиа</a>
+      <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="panel" style="margin-bottom:12px;">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="grid">
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">История сообщений</div>
+      <div class="stack">
+        {% for message in messages %}
+          <div class="msg {{ message.direction }}">
+            <div class="row"><strong>{{ message.author_name or message.direction }}</strong><span class="muted">{{ message.message_ts or message.created_at or '—' }}</span></div>
+            <div style="margin-top:6px; white-space:pre-wrap;">{{ message.text or '—' }}</div>
+          </div>
+        {% else %}
+          <div class="muted">Сообщений пока нет.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="panel">
+        <div style="font-weight:700;margin-bottom:12px;">Карточка чата</div>
+        <form method="post" action="{{ url_for('avito_module.avito_chat_meta', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:grid;gap:10px;">
+          <label>Статус
+            <select name="status">
+              {% for value in ['open', 'lead', 'waiting', 'closed'] %}
+                <option value="{{ value }}" {% if chat.status == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Приоритет
+            <select name="priority">
+              {% for value in ['low', 'normal', 'high'] %}
+                <option value="{{ value }}" {% if chat.priority == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Assigned to
+            <input type="text" name="assigned_to" value="{{ chat.assigned_to or '' }}">
+          </label>
+          <label>Теги
+            <input type="text" name="tags" value="{{ chat.tags | join(', ') }}">
+          </label>
+          <label>Заметка
+            <textarea rows="5" name="note">{{ chat.note or '' }}</textarea>
+          </label>
+          <button type="submit" class="ghost">Сохранить карточку</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-weight:700;margin-bottom:8px;">AI-черновик</div>
+            {% if draft %}
+              {% set draft_state = draft.get('state') or 'draft' %}
+              <div class="row">
+                <span class="pill {% if draft_state == 'ready' %}ok{% elif draft_state in ['review','hold'] %}warn{% elif draft_state == 'error' %}err{% endif %}">{{ draft_state }}</span>
+                <span class="pill">route={{ draft.get('route') }}</span>
+                <span class="pill">confidence={{ draft.get('confidence') }}</span>
+                <span class="pill">model={{ draft.get('model_name') or '—' }}</span>
+              </div>
+              <div class="muted" style="margin-top:8px;">reason={{ draft.get('reason') or '—' }}</div>
+              {% if draft.meta and draft.meta.get('review_note') %}<div class="muted">review note={{ draft.meta.get('review_note') }}</div>{% endif %}
+              <pre>{{ draft.get('body') }}</pre>
+              {% if draft.meta %}
+                <details>
+                  <summary class="muted">Decision/meta JSON</summary>
+                  <pre>{{ draft.meta | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+            {% else %}
+              <div class="muted">Черновик ещё не создан.</div>
+            {% endif %}
+          </div>
+          {% if avito_permissions.ai_rules %}
+          <form method="post" action="{{ url_for('avito_module.avito_draft_regenerate', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}">
+            <button type="submit" class="ghost">Перегенерировать</button>
+          </form>
+          {% endif %}
+        </div>
+
+        {% if draft and avito_permissions.reply %}
+        <div style="display:grid;gap:10px;margin-top:12px;">
+          <form method="post" action="{{ url_for('avito_module.avito_draft_approve', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:grid;gap:10px;">
+            <label>Текст перед одобрением
+              <textarea name="body" rows="5">{{ draft.get('body') or '' }}</textarea>
+            </label>
+            <div class="row">
+              <label style="flex:1;min-width:220px;">Комментарий ревью
+                <input type="text" name="review_note" placeholder="Например: ок для отправки">
+              </label>
+              <label class="muted" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="send_now" value="1"> отправить сразу</label>
+              <button type="submit">Одобрить</button>
+            </div>
+          </form>
+          <div class="row">
+            <form method="post" action="{{ url_for('avito_module.avito_draft_hold', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <input type="text" name="review_note" placeholder="Почему hold" style="width:260px;">
+              <button type="submit" class="warn">Отложить</button>
+            </form>
+            <form method="post" action="{{ url_for('avito_module.avito_draft_reject', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <input type="text" name="review_note" placeholder="Почему отклонён" style="width:260px;">
+              <button type="submit" class="err">Отклонить</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;">Knowledge hits</div>
+        {% for hit in knowledge_hits %}
+          <div class="hit">
+            <div style="font-weight:700;">{{ hit.title }}</div>
+            <div class="muted">kind={{ hit.kind }} · score={{ hit.score }} · item={{ hit.item_title or hit.item_id or '—' }}</div>
+            {% if hit.source_name or hit.source_url %}<div class="muted">source={{ hit.source_name or '—' }} {% if hit.source_url %}· {{ hit.source_url }}{% endif %}</div>{% endif %}
+            <div style="margin-top:8px;white-space:pre-wrap;">{{ hit.excerpt }}</div>
+          </div>
+        {% else %}
+          <div class="muted">Для этого чата релевантные knowledge-фрагменты пока не найдены.</div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;">Похожие прошлые диалоги</div>
+        {% for sample in similar_dialogs %}
+          <div class="sample">
+            <div style="font-weight:700;">{{ sample.get('client_name') or sample.get('title') or sample.get('chat_id') }}</div>
+            <div class="muted">chat={{ sample.get('chat_id') }} · score={{ sample.get('score') }} · item={{ sample.get('item_title') or sample.get('item_id') or '—' }}</div>
+            {% if sample.get('latest_in_text') %}<div style="margin-top:8px;white-space:pre-wrap;"><strong>Входящий:</strong> {{ sample.get('latest_in_text') }}</div>{% endif %}
+            {% if sample.get('latest_out_text') %}<div style="margin-top:8px;white-space:pre-wrap;"><strong>Исходящий:</strong> {{ sample.get('latest_out_text') }}</div>{% endif %}
+            {% if sample.get('excerpt') %}<div class="muted" style="margin-top:8px;">{{ sample.get('excerpt') }}</div>{% endif %}
+          </div>
+        {% else %}
+          <div class="muted">Похожие диалоги пока не найдены.</div>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;">Media suggestions</div>
+            <div class="muted">Подобранные материалы можно закрепить за черновиком. API-отправка вложений сейчас {% if avito_media_send_enabled %}включена{% else %}выключена{% endif %}.</div>
+          </div>
+          <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}"><button type="button" class="ghost">Управлять реестром</button></a>
+        </div>
+        <form method="post" action="{{ url_for('avito_module.avito_select_media', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:grid;gap:10px;margin-top:10px;">
+          {% for asset in media_suggestions %}
+            <label class="asset">
+              <div class="row" style="justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:700;">{{ asset.title }}</div>
+                  <div class="muted">{{ asset.media_kind }} · score={{ asset.score }} · item={{ asset.item_title or asset.item_id or '—' }}</div>
+                  {% if asset.caption %}<div style="margin-top:8px;white-space:pre-wrap;">{{ asset.caption }}</div>{% endif %}
+                </div>
+                <input type="checkbox" name="asset_ids" value="{{ asset.asset_id }}" {% if selected_media and asset.asset_id in (selected_media | map(attribute='asset_id') | list) %}checked{% endif %}>
+              </div>
+              {% if asset.external_url %}
+                {% if asset.media_kind == 'image' %}<div style="margin-top:8px;"><img class="preview" src="{{ asset.external_url }}" alt="{{ asset.title }}"></div>{% elif asset.media_kind == 'video' %}<div style="margin-top:8px;"><video class="preview" controls src="{{ asset.external_url }}"></video></div>{% endif %}
+              {% elif asset.local_path %}
+                {% if asset.media_kind == 'image' %}<div style="margin-top:8px;"><img class="preview" src="{{ url_for('avito_module.avito_media_file', tenant_id=active_tenant_id, asset_id=asset.asset_id) }}" alt="{{ asset.title }}"></div>{% elif asset.media_kind == 'video' %}<div style="margin-top:8px;"><video class="preview" controls src="{{ url_for('avito_module.avito_media_file', tenant_id=active_tenant_id, asset_id=asset.asset_id) }}"></video></div>{% endif %}
+              {% endif %}
+            </label>
+          {% else %}
+            <div class="muted">Подходящих медиа-материалов пока не подобрано.</div>
+          {% endfor %}
+          {% if media_suggestions %}<button type="submit" class="ghost">Сохранить подбор материалов</button>{% endif %}
+        </form>
+        {% if selected_media %}<div class="muted" style="margin-top:12px;">Сейчас выбрано материалов: {{ selected_media | length }}</div>{% endif %}
+      </div>
+
+      <div class="panel">
+        <div style="font-weight:700;margin-bottom:12px;">Ручной ответ</div>
+        {% if avito_permissions.reply %}
+        <form method="post" action="{{ url_for('avito_module.avito_manual_reply', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}" style="display:grid;gap:10px;">
+          <textarea rows="8" name="body">{{ draft.get('body') if draft else '' }}</textarea>
+          {% for asset in selected_media %}
+            <input type="hidden" name="selected_media_ids" value="{{ asset.asset_id }}">
+          {% endfor %}
+          <button type="submit">Отправить вручную</button>
+        </form>
+        {% else %}
+          <div class="muted">Нет прав на ручной ответ.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

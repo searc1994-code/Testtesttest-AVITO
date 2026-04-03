@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кабинеты WB</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1650px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:16px; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+button, .button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e3a8a; }
+.btn-light { background:#f3f4f6; color:#111827; }
+input, textarea { width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; }
+label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.small { font-size:12px; color:#6b7280; }
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+.badge-ok { background:#ecfdf5; color:#065f46; }
+.badge-bad { background:#fef2f2; color:#991b1b; }
+a { color:#2563eb; text-decoration:none; font-weight:700; }
+hr { border:none; border-top:1px solid #e5e7eb; margin:14px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="header">
+        <div>
+            <h1 style="margin:0 0 8px 0;">Кабинеты Wildberries</h1>
+            <div class="small">Одна панель управления для нескольких юрлиц. У каждого кабинета своя авторизация, свои очереди, свои логи и свои данные.</div>
+        </div>
+        <div class="toolbar">
+            {% if active_tenant_id %}
+            <a class="button-link btn-primary" href="/?tenant_id={{ active_tenant_id }}">Открыть активный кабинет</a>
+            {% endif %}
+            <a class="button-link btn-light" href="/complaints{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Жалобы</a>
+            <a class="button-link btn-light" href="/analytics{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Аналитика</a>
+            <a class="button-link btn-light" href="/questions{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Вопросы</a>
+            <a class="button-link btn-light" href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a>
+            {% if avito_module_enabled %}<a class="button-link btn-light" href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %}
+            <a class="button-link btn-light" href="/diagnostics{% if active_tenant_id %}?tenant={{ active_tenant_id }}{% endif %}">Диагностика / Логи</a> {% if app_auth_enabled and current_user %}<a class="button-link btn-light" href="/logout">Выход ({{ current_user }})</a>{% endif %}
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card"><b>Кабинетов:</b><br>{{ tenants|length }}</div>
+        <div class="card"><b>Активный кабинет:</b><br>{{ active_tenant_id or "—" }}</div>
+        <div class="card"><b>Корневая private-папка:</b><br><span class="small">{{ private_root }}</span></div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card" style="margin-bottom:16px;">
+        <h3 style="margin-top:0;">Добавить новый кабинет</h3>
+        <form method="post" action="/tenants/add" class="form-grid">
+            <label>Название юрлица
+                <input type="text" name="name" placeholder="ООО Ромашка" required>
+            </label>
+            <label>Телефон кабинета
+                <input type="text" name="phone" placeholder="+7 ...">
+            </label>
+            <label>WB API key
+                <input type="text" name="wb_api_key" placeholder="WB token" required>
+            </label>
+            <label>Короткий ID / папка
+                <input type="text" name="tenant_slug" placeholder="ooo-romashka">
+            </label>
+            <label>Смайлик
+                <input type="text" name="emoji" placeholder="🏢">
+            </label>
+            <label style="justify-content:end;">
+                <span>&nbsp;</span>
+                <button class="btn-primary" type="submit">Добавить кабинет</button>
+            </label>
+        </form>
+        <div class="small" style="margin-top:10px;">После добавления нажмите «Войти в WB», чтобы сохранить отдельную browser-сессию кабинета.</div>
+    </div>
+
+    {% if tenants %}
+        {% for tenant in tenants %}
+        <div class="card" style="margin-bottom:16px; border:2px solid {% if tenant.id == active_tenant_id %}#2563eb{% else %}transparent{% endif %};">
+            <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+                <div>
+                    <h3 style="margin:0 0 8px 0;">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</h3>
+                    <div class="small">ID: <code>{{ tenant.id }}</code></div>
+                    {% if tenant.phone %}<div class="small">Телефон: {{ tenant.phone }}</div>{% endif %}
+                    <div class="small">Папка: {{ tenant.tenant_root }}</div>
+                    <div style="margin-top:8px;">
+                        {% if tenant.auth_exists %}
+                            <span class="badge badge-ok">🟢 авторизация сохранена</span>
+                        {% else %}
+                            <span class="badge badge-bad">🔴 требуется вход</span>
+                        {% endif %}
+                        {% if tenant.enabled %}
+                            <span class="badge">активен</span>
+                        {% else %}
+                            <span class="badge badge-bad">выключен</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <a class="button-link {% if tenant.id == active_tenant_id %}btn-primary{% else %}btn-light{% endif %}" href="/tenants/select/{{ tenant.id }}?next=/">Открыть</a>
+                    <form method="post" action="/tenants/{{ tenant.id }}/login">
+                        <button class="btn-secondary" type="submit">Войти в WB</button>
+                    </form>
+                    <form method="post" action="/tenants/{{ tenant.id }}/backup">
+                        <button class="btn-light" type="submit">Backup</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="grid" style="margin-top:14px;">
+                <div class="card"><b>Неотвеченных (кэш):</b><br>{{ tenant.unanswered_cached }}</div>
+                <div class="card"><b>Низких оценок (кэш):</b><br>{{ tenant.low_rating_cached }}</div>
+                <div class="card"><b>Очередь ответов:</b><br>{{ tenant.reply_queue_open }}</div>
+                <div class="card"><b>Очередь жалоб:</b><br>{{ tenant.complaint_queue_open }}</div>
+                <div class="card"><b>Черновики ответов:</b><br>{{ tenant.reply_drafts }}</div>
+                <div class="card"><b>Черновики жалоб:</b><br>{{ tenant.complaint_drafts }}</div>
+            </div>
+
+            <hr>
+            <form method="post" action="/tenants/{{ tenant.id }}/update" class="form-grid">
+                <label>Название
+                    <input type="text" name="name" value="{{ tenant.name }}">
+                </label>
+                <label>Телефон
+                    <input type="text" name="phone" value="{{ tenant.phone }}">
+                </label>
+                <label>Смайлик
+                    <input type="text" name="emoji" value="{{ tenant.emoji }}">
+                </label>
+                <label>WB API key
+                    <input type="text" name="wb_api_key" value="{{ tenant.wb_api_key }}">
+                </label>
+                <label>Заметки
+                    <input type="text" name="notes" value="{{ tenant.notes }}">
+                </label>
+                <label style="justify-content:end;">
+                    <span>&nbsp;</span>
+                    <div class="toolbar">
+                        <label style="display:flex; flex-direction:row; align-items:center; gap:8px;"><input type="checkbox" name="enabled" value="1" {% if tenant.enabled %}checked{% endif %}> Активен</label>
+                        <button class="btn-secondary" type="submit">Сохранить</button>
+                    </div>
+                </label>
+            </form>
+
+            <div style="margin-top:12px;" class="toolbar">
+                <form method="post" action="/tenants/{{ tenant.id }}/reset" onsubmit="return confirm('Очистить очереди, черновики, архивы и кэш этого кабинета?');">
+                    <button class="btn-light" type="submit">Сбросить данные кабинета</button>
+                </form>
+                <form method="post" action="/tenants/{{ tenant.id }}/reset" onsubmit="return confirm('Очистить данные, но сохранить авторизацию WB?');">
+                    <input type="hidden" name="keep_auth" value="1">
+                    <button class="btn-light" type="submit">Сбросить, но оставить auth</button>
+                </form>
+                <a class="button-link btn-light" href="/?tenant_id={{ tenant.id }}">Ответы</a>
+                <a class="button-link btn-light" href="/complaints?tenant_id={{ tenant.id }}">Жалобы</a>
+                <a class="button-link btn-light" href="/analytics?tenant_id={{ tenant.id }}">Аналитика</a>
+                <a class="button-link btn-light" href="/automation?tenant_id={{ tenant.id }}">Автоматизация</a>
+                {% if avito_module_enabled %}<a class="button-link btn-light" href="/avito?tenant_id={{ tenant.id }}">Avito</a>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="card">Пока кабинетов нет. Добавьте первый кабинет через форму выше.</div>
+    {% endif %}
+</div>
+</body>
+</html>

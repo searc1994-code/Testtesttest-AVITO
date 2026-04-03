@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Avito DLQ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1280px; margin:0 auto; padding:20px; }
+    .bar,.panel { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar { padding:16px 18px; margin-bottom:16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .panel { padding:16px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #edf2f7; vertical-align:top; }
+    th { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.03em; }
+    .muted { color:#64748b; font-size:13px; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#e2e8f0; font-size:12px; }
+    button { border:0; background:#2563eb; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; font:inherit; }
+    pre { white-space:pre-wrap; background:#0f172a; color:#e2e8f0; padding:10px; border-radius:12px; overflow:auto; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div style="font-size:22px;font-weight:700;">Dead-letter queue Avito</div>
+      <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+    </div>
+    <div>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <form method="get" action="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <label>Статус
+        <select name="status">
+          {% for value in ['open', 'resolved', 'discarded', 'all'] %}
+            <option value="{{ value }}" {% if dlq_status == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Показать</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    {% if dlq_items %}
+      <table>
+        <thead><tr><th>ID</th><th>Source</th><th>Error</th><th>Payload</th><th>Replay</th></tr></thead>
+        <tbody>
+        {% for item in dlq_items %}
+          <tr>
+            <td>#{{ item.dlq_id }}<div class="muted">{{ item.status }}</div><div class="muted">attempts={{ item.attempts }}</div></td>
+            <td>{{ item.source_kind }}<div class="muted">event={{ item.event_id or '—' }}</div></td>
+            <td>{{ item.error_text or '—' }}<div class="muted">{{ item.updated_at }}</div></td>
+            <td><pre>{{ item.payload | tojson(indent=2) }}</pre></td>
+            <td>
+              {% if avito_permissions.admin %}
+              <form method="post" action="{{ url_for('avito_module.avito_replay_dlq', tenant_id=active_tenant_id, dlq_id=item.dlq_id) }}">
+                <button type="submit">Replay</button>
+              </form>
+              {% else %}
+              <div class="muted">Нет прав</div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="muted">DLQ пуст.</div>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

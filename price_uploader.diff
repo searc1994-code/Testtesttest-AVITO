@@ -1,0 +1,271 @@
+--- /mnt/data/workdir/price_uploader.py	2026-03-30 16:36:50.000000000 +0000
++++ /mnt/data/variant3_price_uploader.py	2026-03-30 20:21:31.720929864 +0000
+@@ -60,6 +60,21 @@
+     "open_upload_button_texts": [
+         "Обновить через Excel",
+     ],
++    "open_upload_dropdown_selectors": [
++        "[data-testid='xlsx-action-options-test-id-dropdown-list']",
++        "ul[data-testid='xlsx-action-options-test-id-dropdown-list']",
++        "[data-name='Dropdown'][data-testid='xlsx-action-options-test-id-dropdown-list']",
++    ],
++    "open_upload_dropdown_option_selectors": [
++        "[data-testid='xlsx-action-options-test-id-dropdown-option']",
++        "[data-testid='xlsx-action-options-test-id-dropdown-list'] button[data-testid='xlsx-action-options-test-id-dropdown-option']",
++        "[data-testid='xlsx-action-options-test-id-dropdown-list'] button",
++        "[data-testid='xlsx-action-options-test-id-dropdown-list'] li",
++    ],
++    "open_upload_dropdown_option_texts": [
++        "Цены и скидки",
++        "Цены и скидки через Excel",
++    ],
+     "modal_ready_selectors": [
+         "[data-testid='xlsx-action-file-test-id-file-uploader-view-input']",
+         "[data-testid='xlsx-action-action-test-id-button-primary']",
+@@ -384,6 +399,181 @@
+     return None
+ 
+ 
++def _wait_open_upload_dropdown(page, profile: Dict[str, Any], *, timeout_ms: int = 2500):
++    return _wait_attached(page, profile.get("open_upload_dropdown_selectors") or [], timeout_ms=timeout_ms)
++
++
++def _dom_smart_click(
++    page,
++    *,
++    root_selectors: Sequence[str] = (),
++    candidate_selectors: Sequence[str] = (),
++    target_texts: Sequence[str] = (),
++    forbidden_texts: Sequence[str] = (),
++    prefer_testids: Sequence[str] = (),
++    prefer_class_fragments: Sequence[str] = (),
++    min_score: int = 100,
++) -> Optional[str]:
++    roots = [_clean(item) for item in root_selectors if _clean(item)]
++    selectors = [_clean(item) for item in candidate_selectors if _clean(item)]
++    targets = [_clean(item) for item in target_texts if _clean(item)]
++    forbidden = [_clean(item) for item in forbidden_texts if _clean(item)]
++    testids = [_clean(item) for item in prefer_testids if _clean(item)]
++    classes = [_clean(item) for item in prefer_class_fragments if _clean(item)]
++    script = """
++(args) => {
++  const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim().toLowerCase();
++  const roots = Array.isArray(args?.roots) ? args.roots : [];
++  const selectors = Array.isArray(args?.selectors) ? args.selectors : [];
++  const targets = (Array.isArray(args?.targets) ? args.targets : []).map(normalize).filter(Boolean);
++  const forbidden = (Array.isArray(args?.forbidden) ? args.forbidden : []).map(normalize).filter(Boolean);
++  const testids = (Array.isArray(args?.testids) ? args.testids : []).map(normalize).filter(Boolean);
++  const classFragments = (Array.isArray(args?.classes) ? args.classes : []).map(normalize).filter(Boolean);
++  const minScore = Number(args?.minScore || 100);
++  const defaultSelectors = ['button', '[role="button"]', '[role="menuitem"]', 'li', 'div', 'span'];
++  const rootNodes = roots.length ? roots.map((selector) => document.querySelector(selector)).filter(Boolean) : [document.body];
++  const fire = (node, type, Ctor, extra = {}) => {
++    try {
++      node.dispatchEvent(new Ctor(type, Object.assign({bubbles:true, cancelable:true, composed:true}, extra)));
++      return true;
++    } catch (e) {
++      return false;
++    }
++  };
++  let bestNode = null;
++  let bestScore = -Infinity;
++  let bestReason = '';
++  for (const root of rootNodes) {
++    const rawSelectors = selectors.length ? selectors : defaultSelectors;
++    const nodes = [];
++    for (const selector of rawSelectors) {
++      try {
++        for (const node of Array.from(root.querySelectorAll(selector))) {
++          nodes.push(node);
++        }
++      } catch (e) {}
++    }
++    if (!nodes.length) {
++      nodes.push(...Array.from(root.querySelectorAll(defaultSelectors.join(','))));
++    }
++    for (const node of nodes) {
++      const clickable = node.closest('button,[role="button"],[role="menuitem"],li,div,span') || node;
++      const text = normalize(clickable.innerText || clickable.textContent || '');
++      if (!text) continue;
++      let score = 0;
++      for (const target of targets) {
++        if (text === target) score += 240;
++        else if (text.includes(target)) score += 140;
++      }
++      if (targets.length === 0) score += 40;
++      for (const bad of forbidden) {
++        if (text.includes(bad)) score -= 180;
++      }
++      const testid = normalize(clickable.getAttribute('data-testid') || '');
++      for (const pref of testids) {
++        if (testid.includes(pref)) score += 80;
++      }
++      const className = normalize(clickable.className || '');
++      for (const frag of classFragments) {
++        if (className.includes(frag)) score += 25;
++      }
++      const rect = clickable.getBoundingClientRect();
++      if (rect.width <= 0 || rect.height <= 0) score -= 200;
++      const style = window.getComputedStyle(clickable);
++      if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') score -= 200;
++      if (score > bestScore) {
++        bestScore = score;
++        bestNode = clickable;
++        bestReason = `${testid || className || clickable.tagName}:${score}:${text.slice(0, 80)}`;
++      }
++    }
++  }
++  if (!bestNode || bestScore < minScore) return '';
++  try { bestNode.scrollIntoView({block:'center', inline:'center'}); } catch (e) {}
++  try { bestNode.focus?.(); } catch (e) {}
++  fire(bestNode, 'pointerdown', window.PointerEvent || MouseEvent, {pointerType:'mouse', buttons:1});
++  fire(bestNode, 'mousedown', MouseEvent, {buttons:1});
++  fire(bestNode, 'pointerup', window.PointerEvent || MouseEvent, {pointerType:'mouse', buttons:0});
++  fire(bestNode, 'mouseup', MouseEvent, {buttons:0});
++  try { bestNode.click?.(); } catch (e) {}
++  fire(bestNode, 'click', MouseEvent, {buttons:0});
++  return bestReason;
++}
++"""
++    try:
++        result = _clean(
++            page.evaluate(
++                script,
++                {
++                    "roots": roots,
++                    "selectors": selectors,
++                    "targets": targets,
++                    "forbidden": forbidden,
++                    "testids": testids,
++                    "classes": classes,
++                    "minScore": min_score,
++                },
++            )
++        )
++    except Exception:
++        result = ""
++    return result or None
++
++
++def _select_open_upload_dropdown_option(page, profile: Dict[str, Any]) -> Optional[str]:
++    dropdown = _wait_open_upload_dropdown(page, profile, timeout_ms=2500)
++    if dropdown is None:
++        return None
++
++    option_texts = [_clean(item) for item in (profile.get("open_upload_dropdown_option_texts") or []) if _clean(item)]
++    option_selectors = [_clean(item) for item in (profile.get("open_upload_dropdown_option_selectors") or []) if _clean(item)]
++    forbidden_texts = ["Цены по размерам", "WB Клуб", "автоакц", "Минимальные цены"]
++
++    for text_label in option_texts:
++        candidates = []
++        try:
++            candidates.append(dropdown.get_by_role("button", name=text_label).first)
++        except Exception:
++            pass
++        try:
++            candidates.append(dropdown.get_by_text(text_label, exact=False).first)
++        except Exception:
++            pass
++        for candidate in candidates:
++            try:
++                candidate.wait_for(timeout=1200)
++                if not candidate.is_visible():
++                    continue
++                try:
++                    candidate.click(timeout=2500)
++                    return f"text:{text_label}"
++                except Exception:
++                    pass
++                try:
++                    candidate.click(timeout=2500, force=True)
++                    return f"text_force:{text_label}"
++                except Exception:
++                    pass
++                if _click_locator_center(page, candidate, attempts=2):
++                    return f"text_mouse:{text_label}"
++            except Exception:
++                continue
++
++    smart_result = _dom_smart_click(
++        page,
++        root_selectors=profile.get("open_upload_dropdown_selectors") or [],
++        candidate_selectors=option_selectors,
++        target_texts=option_texts,
++        forbidden_texts=forbidden_texts,
++        prefer_testids=["xlsx-action-options-test-id-dropdown-option", "xlsx-action-options"],
++        prefer_class_fragments=["Dropdown-option", "Dropdown-list__item"],
++        min_score=90,
++    )
++    if smart_result:
++        return f"smart:{smart_result}"
++    return None
++
++
+ def _dom_click_by_selector(page, selector: str) -> bool:
+     selector = _clean(selector)
+     if not selector:
+@@ -605,6 +795,18 @@
+     direct_methods = [
+         ("dom.button.click", lambda: any(_dom_click_by_selector(page, selector) for selector in selectors)),
+         ("dom.button.pointer", lambda: any(_dom_pointer_by_selector(page, selector) for selector in selectors)),
++        (
++            "dom.button.smart",
++            lambda: _dom_smart_click(
++                page,
++                candidate_selectors=list(selectors) + ["button", "[role='button']"],
++                target_texts=texts,
++                prefer_testids=["xlsx-action-open-test-id-button-interface", "xlsx-action-open-test-id"],
++                prefer_class_fragments=["button__", "caption__"],
++                min_score=120,
++            )
++            is not None,
++        ),
+     ]
+ 
+     for round_index in range(1, 5):
+@@ -655,7 +857,22 @@
+                 pass
+             try:
+                 callback()
+-                modal = _wait_modal_ready(page, profile, timeout_ms=4500)
++                modal = _wait_modal_ready(page, profile, timeout_ms=2500)
++                if modal is None:
++                    option_mode = _select_open_upload_dropdown_option(page, profile)
++                    if option_mode:
++                        try:
++                            background_jobs.progress(
++                                "prices_upload_pick_dropdown_option",
++                                f"Выбираю пункт выпадающего меню для Excel: {option_mode}",
++                                percent=15,
++                                method=name,
++                                round=round_index,
++                                option_mode=option_mode,
++                            )
++                        except Exception:
++                            pass
++                        modal = _wait_modal_ready(page, profile, timeout_ms=4500)
+                 if modal is not None:
+                     try:
+                         background_jobs.progress(
+@@ -1047,6 +1264,21 @@
+             time.sleep(1.8)
+         return {**warning_meta, "submit_mode": "mouse_center"}
+ 
++    smart_submit = _dom_smart_click(
++        page,
++        candidate_selectors=(profile.get("submit_button_selectors") or []) + ["button", "[role='button']"],
++        target_texts=profile.get("submit_button_texts") or [],
++        prefer_testids=["xlsx-action-action-test-id-button-primary", "button-primary"],
++        prefer_class_fragments=["button__", "caption__"],
++        min_score=120,
++    )
++    if smart_submit:
++        try:
++            page.wait_for_timeout(1800)
++        except Exception:
++            time.sleep(1.8)
++        return {**warning_meta, "submit_mode": f"smart:{smart_submit}"}
++
+     automation_browser.capture_page_artifacts(page, tenant_dir, f"price_submit_click_failed_{file_path.stem}", note="Не удалось нажать кнопку 'Обновить стоимость'")
+     raise PriceUploadError("Не удалось нажать кнопку 'Обновить стоимость'")
+ 

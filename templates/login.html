@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token_value }}">
+<title>Вход в панель WB</title>
+<style nonce="{{ csp_nonce }}">
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 520px; margin: 0 auto; padding: 48px 20px; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:24px; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; margin-bottom:12px; }
+input { width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; }
+button { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; background:#2563eb; color:#fff; }
+.small { font-size:12px; color:#6b7280; }
+code { background:#f3f4f6; padding:2px 5px; border-radius:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1 style="margin:0 0 8px 0;">Вход в панель WB</h1>
+    <div class="small" style="margin-bottom:16px;">Доступ к панели защищён базовой сессионной авторизацией. Логин по умолчанию: <code>{{ admin_username }}</code>.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="/login">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token_value }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Логин
+        <input type="text" name="username" value="{{ admin_username }}" autocomplete="username" required>
+      </label>
+      <label>Пароль
+        <input type="password" name="password" autocomplete="current-password" required autofocus>
+      </label>
+      <button type="submit">Войти</button>
+    </form>
+
+    <div class="small" style="margin-top:16px;">
+      {% if auth_state and auth_state.source == 'env' %}
+        Пароль администратора задан через переменную окружения <code>APP_ADMIN_PASSWORD</code>.
+      {% else %}
+        Пароль хранится в зашифрованном виде в приватной директории приложения.
+      {% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

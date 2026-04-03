@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Жалобы на отзывы 1–3★</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1600px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.nav { display:flex; gap:14px; flex-wrap:wrap; }
+.nav a { color:#2563eb; text-decoration:none; font-weight:700; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+.card,.table-card,.empty { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); }
+.card,.table-card { padding:16px; }
+.empty { padding:24px; text-align:center; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+.muted { color:#6b7280; }
+button, .button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e3a8a; }
+.btn-danger { background:#7c2d12; color:#fff; }
+.btn-light { background:#f3f4f6; color:#111827; }
+.actions { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+.filters { display:grid; grid-template-columns: 1.3fr repeat(4,minmax(150px, 220px)) auto auto; gap:10px; align-items:end; }
+.filters label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+.filters input[type="text"], .filters select, .filters input[type="number"] { padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; background:#fff; }
+.filters .checkbox-inline { display:flex; align-items:center; gap:8px; flex-direction:row; margin-top:24px; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+th { position: sticky; top: 0; background:#fff; z-index: 1; }
+.review-box { white-space:pre-wrap; max-width:500px; }
+.reason-box { white-space:pre-wrap; max-width:430px; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+.badge-cat { background:#e0e7ff; color:#1e3a8a; }
+.badge-status { background:#f3f4f6; color:#374151; }
+.small { font-size:12px; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
+.pagination a { color:#2563eb; text-decoration:none; font-weight:700; }
+.checkbox-tools { display:flex; gap:8px; flex-wrap:wrap; }
+.sticky-actions { position: sticky; top: 8px; z-index: 2; }
+@media (max-width: 1180px) {
+  .filters { grid-template-columns: 1fr 1fr; }
+}
+
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+  {% endif %}
+    <div class="header">
+        <div>
+            <h1 style="margin:0 0 8px 0;">Жалобы на отзывы 1–3★</h1>
+            <div class="muted">Вы вручную отмечаете подозрительные отзывы, AI готовит категорию и текст жалобы, затем браузерный модуль отправляет жалобу через кабинет WB.</div>
+        </div>
+        <div class="nav">
+            <a href="/">К ответам</a>
+            <a href="/complaints/effectiveness">Результативность жалоб</a>
+            <a href="/analytics">Аналитика</a>
+            <a href="/questions">Вопросы</a>
+            {% if avito_module_enabled %}<a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %}
+            <a href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a>
+            <a href="/diagnostics">Диагностика / Логи</a>
+            {% if app_auth_enabled and current_user %}<a href="/logout">Выход ({{ current_user }})</a>{% endif %}
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card"><b>Неотвеченных в WB:</b><br>{{ count_unanswered }}</div>
+        <div class="card"><b>Низких оценок в скане:</b><br>{{ low_total_scanned }}</div>
+        <div class="card"><b>После фильтров:</b><br>{{ total_filtered }}</div>
+        <div class="card"><b>Скрыто как уже обжалованные:</b><br>{{ submitted_hidden }}</div>
+        <div class="card"><b>AI-черновиков жалоб:</b><br>{{ draft_total }}</div>
+        <div class="card"><b>Очередь жалоб:</b><br>{{ queue_total }}</div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+        <b>Безопасность</b><br>
+        <div class="muted small">Все чувствительные файлы вынесены за пределы проекта: <code>{{ private_dir }}</code></div>
+        <div class="muted small">Файл авторизации WB: <code>{{ auth.state_path }}</code></div>
+        <div class="muted small">Статус сессии: {% if auth.exists %}<b>сохранена</b>{% else %}<b>не найдена</b>{% endif %}{% if auth.saved_at %} — {{ auth.saved_at }}{% endif %}</div>
+        <div class="muted small">Первичная авторизация: <code>python login_wb.py</code></div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if load_error %}
+        <div class="flash flash-error">Ошибка загрузки: {{ load_error }}</div>
+    {% endif %}
+
+    {% if background_jobs_latest %}
+    <div class="card" style="margin-bottom:16px;">
+        <b>Фоновые задачи</b>
+        <div class="small muted" style="margin-top:6px;">Последние задачи по текущему кабинету.</div>
+        {% for job in background_jobs_latest %}<div class="small" style="margin-top:6px;"><span class="badge badge-status">{{ job.kind }}</span> {{ job.label }} — {{ job.status }}{% if job.error %} · {{ job.error }}{% elif job.last_message %} · {{ job.last_message }}{% endif %}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:16px;">
+        <form method="get" action="/complaints" class="filters">
+            <label>
+                Поиск
+                <input type="text" name="q" value="{{ filters.q }}" placeholder="товар, артикул, nmID, текст, пользователь">
+            </label>
+            <label>
+                Сортировка
+                <select name="sort">
+                    <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Сначала новые</option>
+                    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Сначала старые</option>
+                    <option value="stars_low" {% if filters.sort == 'stars_low' %}selected{% endif %}>Сначала 1★ → 3★</option>
+                    <option value="stars_high" {% if filters.sort == 'stars_high' %}selected{% endif %}>Сначала 3★ → 1★</option>
+                </select>
+            </label>
+            <label>
+                Оценка
+                <select name="stars">
+                    <option value="all" {% if filters.stars == 'all' %}selected{% endif %}>Все 1–3★</option>
+                    <option value="1" {% if filters.stars == '1' %}selected{% endif %}>Только 1★</option>
+                    <option value="2" {% if filters.stars == '2' %}selected{% endif %}>Только 2★</option>
+                    <option value="3" {% if filters.stars == '3' %}selected{% endif %}>Только 3★</option>
+                </select>
+            </label>
+            <label>
+                Черновик
+                <select name="draft">
+                    <option value="all" {% if filters.draft == 'all' %}selected{% endif %}>Все</option>
+                    <option value="with_draft" {% if filters.draft == 'with_draft' %}selected{% endif %}>Только с черновиком</option>
+                    <option value="without_draft" {% if filters.draft == 'without_draft' %}selected{% endif %}>Только без черновика</option>
+                </select>
+            </label>
+            <label>
+                Статус очереди
+                <select name="queue">
+                    <option value="all" {% if filters.queue == 'all' %}selected{% endif %}>Все</option>
+                    <option value="not_queued" {% if filters.queue == 'not_queued' %}selected{% endif %}>Не в очереди</option>
+                    <option value="ready" {% if filters.queue == 'ready' %}selected{% endif %}>С готовым черновиком</option>
+                    <option value="queued" {% if filters.queue == 'queued' %}selected{% endif %}>В очереди</option>
+                    <option value="processing" {% if filters.queue == 'processing' %}selected{% endif %}>В работе</option>
+                    <option value="failed" {% if filters.queue == 'failed' %}selected{% endif %}>С ошибкой</option>
+                    <option value="submitted" {% if filters.queue == 'submitted' %}selected{% endif %}>Уже отправленные</option>
+                </select>
+            </label>
+            <label class="checkbox-inline">
+                <input type="checkbox" name="hide_submitted" value="1" {% if filters.hide_submitted %}checked{% endif %}>
+                Скрывать уже отправленные жалобы
+            </label>
+            <div class="actions" style="margin:0; justify-content:flex-end;">
+                <button class="btn-secondary" type="submit">Применить</button>
+                <a class="button-link btn-light" href="/complaints">Сбросить</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card sticky-actions" style="margin-bottom:16px;">
+        <form method="post" action="/complaints/process" class="actions" style="margin-bottom:0;">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="stars" value="{{ filters.stars }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+            <label>
+                Сколько жалоб взять из очереди
+                <input type="number" name="max_items" value="0" min="0" style="width:110px;">
+            </label>
+            <span class="small muted">0 = обработать всю очередь</span>
+            <label class="small"><input type="checkbox" name="dry_run" value="1"> Dry run (без финальной отправки)</label>
+            <button class="btn-danger" type="submit">Запустить браузерную обработку очереди</button>
+        </form>
+        {% if stats.top_categories %}
+            <div class="small muted" style="margin-top:10px;">Частые категории: {% for name, cnt in stats.top_categories %}<span class="badge">{{ name }} — {{ cnt }}</span>{% endfor %}</div>
+        {% endif %}
+    </div>
+
+    {% if rows %}
+        <form method="post" id="selection-form">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="stars" value="{{ filters.stars }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+            <div class="toolbar">
+                <div class="actions" style="margin-bottom:0;">
+                    <button class="btn-secondary" formaction="/complaints/prepare" formmethod="post" type="submit">Подготовить AI-черновики для выбранных</button>
+                    <button class="btn-primary" formaction="/complaints/queue" formmethod="post" type="submit">Добавить выбранные черновики в очередь</button>
+                </div>
+                <div class="checkbox-tools">
+                    <button type="button" class="btn-light" onclick="setAllVisible(true)">Выделить все на странице</button>
+                    <button type="button" class="btn-light" onclick="setAllVisible(false)">Снять все</button>
+                    <button type="button" class="btn-light" onclick="invertVisible()">Инвертировать</button>
+                </div>
+            </div>
+            <div class="table-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:56px;"><input type="checkbox" id="master-checkbox" onclick="toggleMaster(this)"></th>
+                            <th>Оценка</th>
+                            <th>Товар</th>
+                            <th>Отзыв</th>
+                            <th>AI‑черновик жалобы</th>
+                            <th>Очередь / результат</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for r in rows %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="row-checkbox" name="selected_ids" value="{{ r.id }}">
+                                <input type="hidden" name="review__{{ r.id }}__product_name" value="{{ r.product_name }}">
+                                <input type="hidden" name="review__{{ r.id }}__supplier_article" value="{{ r.supplier_article }}">
+                                <input type="hidden" name="review__{{ r.id }}__brand_name" value="{{ r.brand_name }}">
+                                <input type="hidden" name="review__{{ r.id }}__nm_id" value="{{ r.nm_id }}">
+                                <input type="hidden" name="review__{{ r.id }}__stars" value="{{ r.stars }}">
+                                <input type="hidden" name="review__{{ r.id }}__user_name" value="{{ r.user_name }}">
+                                <input type="hidden" name="review__{{ r.id }}__created_date" value="{{ r.created_date }}">
+                                <input type="hidden" name="review__{{ r.id }}__subject_name" value="{{ r.subject_name }}">
+                                <input type="hidden" name="review__{{ r.id }}__text" value="{{ r.text }}">
+                                <input type="hidden" name="review__{{ r.id }}__pros" value="{{ r.pros }}">
+                                <input type="hidden" name="review__{{ r.id }}__cons" value="{{ r.cons }}">
+                            </td>
+                            <td><b>{{ r.stars_view }}</b><br><span class="small muted">{{ r.stars }}★</span></td>
+                            <td>
+                                <b>{{ r.product_name }}</b><br>
+                                <span class="small muted">Арт.: {{ r.supplier_article or '—' }}</span><br>
+                                <span class="small muted">nmID: {{ r.nm_id or '—' }}</span><br>
+                                <span class="small muted">{{ r.user_name or '—' }} · {{ r.created_date or '—' }}</span>
+                            </td>
+                            <td><div class="review-box">{{ r.review_text }}</div></td>
+                            <td>
+                                {% if r.draft %}
+                                    <div><span class="badge badge-cat">{{ r.draft.category }}</span></div>
+                                    <div class="reason-box small">{{ r.draft.reason }}</div>
+                                    {% if r.draft.signals %}<div class="small muted">Сигналы: {{ r.draft.signals|join(', ') }}</div>{% endif %}
+                                    <div class="small muted">Поиск в WB: {{ r.draft.search_value or r.nm_id or r.supplier_article }}</div>
+                                {% else %}
+                                    <span class="small muted">Черновик ещё не подготовлен</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.queue_status %}<div><span class="badge badge-status">{{ r.queue_status }}</span></div>{% endif %}
+                                {% if r.result_status %}<div class="small">Последний результат: {{ r.result_status }}</div>{% endif %}
+                                {% if r.result_error %}<div class="small muted">{{ r.result_error }}</div>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% else %}
+        <div class="empty">
+            <h3 style="margin-top:0;">Подходящих отзывов по текущим фильтрам не найдено</h3>
+            <div class="muted">Попробуйте сбросить фильтры или обновить страницу позже.</div>
+        </div>
+    {% endif %}
+
+    <div class="pagination">
+        <div class="muted small">Страница {{ page }} из {{ page_count }} · Показано {{ rows|length }} из {{ total_filtered }}</div>
+        <div class="actions" style="margin-bottom:0;">
+            {% if has_prev %}
+                <a class="button-link btn-light" href="{{ url_for('complaints', page=page-1, sort=filters.sort, stars=filters.stars, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">← Предыдущая</a>
+            {% endif %}
+            {% if has_next %}
+                <a class="button-link btn-light" href="{{ url_for('complaints', page=page+1, sort=filters.sort, stars=filters.stars, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">Следующая →</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+const complaintsSelectionKey = 'complaints-panel-selected-ids';
+function rowCheckboxes() {
+    return Array.from(document.querySelectorAll('.row-checkbox'));
+}
+function getSelectedSet() {
+    try {
+        const data = JSON.parse(localStorage.getItem(complaintsSelectionKey) || '[]');
+        return new Set(Array.isArray(data) ? data : []);
+    } catch (e) {
+        return new Set();
+    }
+}
+function saveSelectedSet() {
+    const ids = rowCheckboxes().filter(cb => cb.checked).map(cb => cb.value);
+    localStorage.setItem(complaintsSelectionKey, JSON.stringify(ids));
+}
+function restoreSelectedSet() {
+    const selected = getSelectedSet();
+    rowCheckboxes().forEach(cb => {
+        cb.checked = selected.has(cb.value);
+    });
+    syncMaster();
+}
+function syncMaster() {
+    const boxes = rowCheckboxes();
+    const checked = boxes.filter(x => x.checked).length;
+    const master = document.getElementById('master-checkbox');
+    if (!master) return;
+    master.checked = boxes.length > 0 && checked === boxes.length;
+    master.indeterminate = checked > 0 && checked < boxes.length;
+}
+function setAllVisible(state) {
+    rowCheckboxes().forEach(cb => cb.checked = state);
+    saveSelectedSet();
+    syncMaster();
+}
+function invertVisible() {
+    rowCheckboxes().forEach(cb => cb.checked = !cb.checked);
+    saveSelectedSet();
+    syncMaster();
+}
+function toggleMaster(master) {
+    setAllVisible(master.checked);
+}
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('row-checkbox')) {
+        saveSelectedSet();
+        syncMaster();
+    }
+});
+document.addEventListener('submit', function(e) {
+    if (e.target && e.target.id === 'selection-form') {
+        saveSelectedSet();
+    }
+});
+restoreSelectedSet();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const tenantId = {{ active_tenant_id|tojson }};
+  if(!tenantId) return;
+  document.querySelectorAll('form').forEach(function(form){
+    if(form.querySelector('input[name="tenant_id"]')) return;
+    const input=document.createElement('input');
+    input.type='hidden'; input.name='tenant_id'; input.value=tenantId;
+    form.appendChild(input);
+  });
+  document.querySelectorAll('a[href]').forEach(function(a){
+    const href=a.getAttribute('href');
+    if(!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+    if(href.includes('tenant_id=')) return;
+    try{
+      const url = new URL(href, window.location.origin);
+      if(url.origin !== window.location.origin) return;
+      url.searchParams.set('tenant_id', tenantId);
+      a.setAttribute('href', url.pathname + url.search + url.hash);
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>База знаний Avito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1320px; margin:0 auto; padding:20px; }
+    .bar,.panel { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar { padding:16px 18px; margin-bottom:16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .grid { display:grid; grid-template-columns: 1.1fr 1fr; gap:16px; }
+    .panel { padding:16px; }
+    input, textarea, select { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
+    button { border:0; background:#2563eb; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font:inherit; }
+    button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
+    button.err { background:#b91c1c; }
+    .muted { color:#64748b; font-size:13px; }
+    .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
+    .doc { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div style="font-size:22px;font-weight:700;">База знаний Avito</div>
+      <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+      <div class="muted">Документов: {{ avito_metrics.knowledge_docs_total }} · активных: {{ avito_metrics.knowledge_docs_active }}</div>
+    </div>
+    <div class="row">
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">HITL очередь</a>
+      <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}">Медиа</a>
+      <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="grid">
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">Импорт / обновление базы знаний</div>
+      {% if avito_permissions.ai_rules %}
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('avito_module.avito_knowledge_import', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;margin-bottom:18px;">
+        <label>Файл для импорта
+          <input type="file" name="import_file" accept=".txt,.md,.csv,.tsv,.json,.jsonl,.xlsx,text/plain,text/markdown,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </label>
+        <div class="row">
+          <label style="flex:1;min-width:220px;">Default kind
+            <select name="default_kind">
+              {% for value in ['faq', 'listing_card', 'policy', 'shipping', 'condition', 'size', 'script', 'qa'] %}
+                <option value="{{ value }}">{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label style="flex:1;min-width:220px;">Source name
+            <input type="text" name="source_name" placeholder="Например: прайс менеджера / xlsx импорт">
+          </label>
+        </div>
+        <button type="submit" class="ghost">Импортировать документы</button>
+      </form>
+
+      <div style="font-weight:700;margin-bottom:12px;">Добавить / обновить вручную</div>
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('avito_module.avito_knowledge_upsert', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
+        <input type="hidden" name="doc_id" value="">
+        <label>Заголовок<input type="text" name="title" placeholder="Например: FAQ по коляске 2в1"></label>
+        <label>Тип
+          <select name="kind">
+            {% for value in ['faq', 'listing_card', 'policy', 'shipping', 'condition', 'size', 'script', 'qa'] %}
+              <option value="{{ value }}">{{ value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="row">
+          <label style="flex:1;min-width:180px;">Item ID<input type="text" name="item_id"></label>
+          <label style="flex:2;min-width:220px;">Item title<input type="text" name="item_title"></label>
+        </div>
+        <label>Теги<input type="text" name="tags" placeholder="faq, доставка, stroller"></label>
+        <div class="row">
+          <label style="flex:1;min-width:180px;">Источник<input type="text" name="source_name" placeholder="Google Doc / FAQ / менеджер"></label>
+          <label style="flex:2;min-width:220px;">Source URL<input type="text" name="source_url" placeholder="https://..."></label>
+        </div>
+        <label>Текст документа<textarea rows="12" name="body_text" placeholder="Сюда можно вставить описание товара, FAQ, условия доставки, таблицу размеров..."></textarea></label>
+        <label>Или загрузить текстовый файл<input type="file" name="upload_file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,application/json"></label>
+        <label>Внутренние заметки<input type="text" name="meta_notes"></label>
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="active" checked> активный документ</label>
+        <button type="submit">Сохранить документ</button>
+      </form>
+      {% else %}
+        <div class="muted">Нет прав на изменение базы знаний.</div>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:700;margin-bottom:12px;">Документы</div>
+      <form method="get" action="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}" class="row" style="margin-bottom:12px;">
+        <input type="text" name="q" value="{{ kb_search }}" placeholder="Поиск по title/body/item/tags" style="flex:2;min-width:260px;">
+        <select name="kind" style="flex:1;min-width:160px;">
+          {% for value in kb_kinds %}
+            <option value="{{ value }}" {% if kb_kind == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="ghost">Найти</button>
+      </form>
+      {% for doc in kb_docs %}
+        <div class="doc">
+          <div class="row" style="justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-weight:700;">{{ doc.title }}</div>
+              <div class="muted">kind={{ doc.kind }} · item={{ doc.item_title or doc.item_id or '—' }} · active={{ 'yes' if doc.active else 'no' }}</div>
+              {% if doc.tags %}<div class="muted">tags={{ doc.tags | join(', ') }}</div>{% endif %}
+              {% if doc.source_name or doc.source_url %}<div class="muted">source={{ doc.source_name or '—' }} {% if doc.source_url %}<code>{{ doc.source_url }}</code>{% endif %}</div>{% endif %}
+            </div>
+            {% if avito_permissions.ai_rules %}
+            <form method="post" action="{{ url_for('avito_module.avito_knowledge_delete', tenant_id=active_tenant_id, doc_id=doc.doc_id) }}" onsubmit="return confirm('Удалить документ базы знаний?');">
+              <button type="submit" class="err">Удалить</button>
+            </form>
+            {% endif %}
+          </div>
+          <div style="margin-top:10px;white-space:pre-wrap;">{{ doc.body_text[:1200] }}{% if doc.body_text|length > 1200 %}…{% endif %}</div>
+          <div class="muted" style="margin-top:8px;">updated={{ doc.updated_at }}</div>
+        </div>
+      {% else %}
+        <div class="muted">Документов пока нет.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

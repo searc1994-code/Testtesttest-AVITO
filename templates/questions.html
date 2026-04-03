@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вопросы покупателей</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1780px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.nav { display:flex; gap:14px; flex-wrap:wrap; }
+.nav a { color:#2563eb; text-decoration:none; font-weight:700; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+.card,.table-card,.empty { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); }
+.card,.table-card { padding:16px; }
+.empty { padding:24px; text-align:center; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+.notice { background:#eff6ff; color:#1e3a8a; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+.warning { background:#fff7ed; color:#9a3412; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+.muted { color:#6b7280; }
+button, .button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e3a8a; }
+.btn-danger { background:#7c2d12; color:#fff; }
+.btn-light { background:#f3f4f6; color:#111827; }
+.btn-ghost { background:#fff; color:#111827; border:1px solid #d1d5db; }
+.btn-linkish { background:transparent; color:#2563eb; padding:0; font-weight:700; }
+.actions { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+.filters { display:grid; grid-template-columns:1.4fr repeat(4,minmax(150px,220px)) auto auto; gap:10px; align-items:end; }
+.filters label, .form-grid label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+.filters input[type="text"], .filters select, .filters input[type="number"], textarea, input[type="file"], .form-grid input[type="text"], .form-grid input[type="number"], .form-grid select {
+  padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; background:#fff; box-sizing:border-box;
+}
+.filters .checkbox-inline { display:flex; align-items:center; gap:8px; flex-direction:row; margin-top:24px; }
+textarea { width:100%; min-height:120px; resize:vertical; font-family:inherit; }
+textarea.reply-area { min-height:180px; }
+textarea.comment-area { min-height:112px; }
+textarea.rule-area { min-height:220px; }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; align-items:start; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+th { position: sticky; top: 0; background:#fff; z-index: 2; }
+.question-box, .answer-box { white-space:pre-wrap; }
+.question-box { max-width:520px; }
+.answer-box { max-width:620px; }
+.small { font-size:12px; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
+.pagination a { color:#2563eb; text-decoration:none; font-weight:700; }
+.checkbox-tools { display:flex; gap:8px; flex-wrap:wrap; }
+.sticky-actions { position: sticky; top: 8px; z-index: 3; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+.badge-status { background:#f3f4f6; color:#374151; }
+.badge-ai { background:#e0e7ff; color:#1e3a8a; }
+.badge-ok { background:#ecfdf5; color:#065f46; }
+.badge-warn { background:#fef3c7; color:#92400e; }
+.badge-bad { background:#fef2f2; color:#991b1b; }
+.badge-purple { background:#ede9fe; color:#6d28d9; }
+details summary { cursor:pointer; font-weight:700; }
+.mode-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.mode-tab { display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:999px; text-decoration:none; font-weight:700; background:#f3f4f6; color:#111827; }
+.mode-tab.active { background:#2563eb; color:#fff; }
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+.cluster-row td { background:#f8fafc; border-top:1px solid #dbeafe; border-bottom:1px solid #dbeafe; font-weight:700; }
+.cluster-row .cluster-meta { font-weight:400; color:#6b7280; font-size:12px; margin-left:10px; }
+.quick-pills, .action-pills, .row-buttons { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.quick-pills button, .action-pills button, .row-buttons button { padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.quick-pills button { background:#f3f4f6; color:#111827; }
+.action-pills button { background:#fff; border:1px solid #d1d5db; color:#111827; }
+.action-pills button.active-answer { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+.action-pills button.active-reject { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+.action-pills button.active-skip { background:#f9fafb; border-color:#d1d5db; color:#6b7280; }
+.rule-note { background:#f9fafb; border-radius:12px; padding:10px; }
+.status-stack > div { margin-bottom:6px; }
+.compact-table th:nth-child(1) { width:56px; }
+.compact-table th:nth-child(2) { width:230px; }
+.compact-table th:nth-child(4) { width:360px; }
+.compact-table th:nth-child(6) { width:220px; }
+.helper { background:#f8fafc; border-radius:12px; padding:10px 12px; margin-bottom:12px; }
+@media (max-width: 1280px) {
+  .filters { grid-template-columns: 1fr 1fr; }
+  .compact-table th:nth-child(2), .compact-table th:nth-child(4), .compact-table th:nth-child(6) { width:auto; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+  {% endif %}
+
+  <div class="header">
+    <div>
+      <h1 style="margin:0 0 8px 0;">Вопросы покупателей</h1>
+      <div class="muted">Основной режим — одна лента вопросов, сгруппированная по кластерам. Менеджер быстро пишет короткий комментарий по строке, а ИИ превращает его в подробный ответ покупателю.</div>
+      <div class="mode-tabs">
+        <a class="mode-tab {% if filters.mode == 'questions' %}active{% endif %}" href="{{ url_for('questions', tenant_id=active_tenant_id, mode='questions', page_size=filters.page_size, sort=filters.sort, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0, cluster=filters.cluster) }}">Лента вопросов</a>
+        <a class="mode-tab {% if filters.mode == 'clusters' %}active{% endif %}" href="{{ url_for('questions', tenant_id=active_tenant_id, mode='clusters', page_size=filters.page_size, sort='cluster', draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">Кластеры (расширенно)</a>
+      </div>
+    </div>
+    <div class="nav">
+      <a href="/{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">К отзывам</a>
+      <a href="/complaints{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">К жалобам</a>
+      <a href="/analytics{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Аналитика</a>
+      <a href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a>
+      {% if avito_module_enabled %}<a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %}
+      <a href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Кабинеты</a>
+      <a href="/diagnostics{% if active_tenant_id %}?tenant={{ active_tenant_id }}{% endif %}">Диагностика / Логи</a>
+      {% if app_auth_enabled and current_user %}<a href="/logout">Выход ({{ current_user }})</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><b>Неотвеченных в WB:</b><br>{{ count_unanswered }}</div>
+    <div class="card"><b>После фильтров:</b><br>{{ total_filtered }}</div>
+    <div class="card"><b>Кластеров:</b><br>{{ cluster_total }}</div>
+    <div class="card"><b>Черновиков:</b><br>{{ draft_total }}</div>
+    <div class="card"><b>Auto-ready:</b><br>{{ draft_ready_total }}</div>
+    <div class="card"><b>Очередь:</b><br>{{ queue_open }}</div>
+    <div class="card"><b>Архив отправок:</b><br>{{ archive_total }}</div>
+    <div class="card"><b>Снимок обновлён:</b><br><span class="small">{{ snapshot_fetched_at or '—' }}</span></div>
+  </div>
+
+  {% if truncated %}
+    <div class="warning">Снимок вопросов обрезан внутренним лимитом. Для очень большого хвоста можно позже добавить отдельную историческую догрузку окнами по датам.</div>
+  {% endif %}
+  {% if has_new_questions %}
+    <div class="notice">WB сообщает, что появились новые вопросы. Можно обновить снимок и при необходимости запустить автообработку уверенных правил.</div>
+  {% endif %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if load_error %}
+    <div class="flash flash-error">Ошибка загрузки: {{ load_error }}</div>
+  {% endif %}
+
+  {% if background_jobs_latest %}
+  <div class="helper">
+    <b>Фоновые задачи</b>
+    {% for job in background_jobs_latest %}<div class="small" style="margin-top:6px;"><span class="badge badge-status">{{ job.kind }}</span> {{ job.label }} — {{ job.status }}{% if job.error %} · {{ job.error }}{% elif job.last_message %} · {{ job.last_message }}{% endif %}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if last_cluster_import and last_cluster_import.imported_at %}
+    <div class="helper">
+      <b>Последний импорт cluster_map:</b> {{ last_cluster_import.imported_at }}
+      · файл: {{ last_cluster_import.source_name or '—' }}
+      · применено строк: {{ last_cluster_import.applied or 0 }}
+      · кластеров: {{ last_cluster_import.cluster_count or 0 }}
+      {% if last_cluster_import.preserved_manual %}· сохранено ручных подкластеров: {{ last_cluster_import.preserved_manual }}{% endif %}
+      {% if last_cluster_import.cleaned_ai_drafts %}· удалено устаревших AI-черновиков: {{ last_cluster_import.cleaned_ai_drafts }}{% endif %}
+    </div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom:16px;">
+    <form method="get" action="/questions" class="filters">
+      <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+      <label>
+        Поиск
+        <input type="text" name="q" value="{{ filters.q }}" placeholder="артикул, nmID, текст вопроса, название товара">
+      </label>
+      <label>
+        Режим
+        <select name="mode">
+          <option value="questions" {% if filters.mode == 'questions' %}selected{% endif %}>Лента вопросов</option>
+          <option value="clusters" {% if filters.mode == 'clusters' %}selected{% endif %}>Кластеры</option>
+        </select>
+      </label>
+      <label>
+        Сортировка
+        <select name="sort">
+          <option value="cluster" {% if filters.sort == 'cluster' %}selected{% endif %}>По кластерам</option>
+          <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Сначала новые</option>
+          <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Сначала старые</option>
+        </select>
+      </label>
+      <label>
+        Черновик
+        <select name="draft">
+          <option value="all" {% if filters.draft == 'all' %}selected{% endif %}>Все</option>
+          <option value="with_draft" {% if filters.draft == 'with_draft' %}selected{% endif %}>Только с черновиком</option>
+          <option value="without_draft" {% if filters.draft == 'without_draft' %}selected{% endif %}>Только без черновика</option>
+          <option value="auto_ready" {% if filters.draft == 'auto_ready' %}selected{% endif %}>Только auto-ready</option>
+          <option value="rule_based" {% if filters.draft == 'rule_based' %}selected{% endif %}>Только по правилам</option>
+        </select>
+      </label>
+      <label>
+        Статус очереди
+        <select name="queue">
+          <option value="all" {% if filters.queue == 'all' %}selected{% endif %}>Все</option>
+          <option value="not_queued" {% if filters.queue == 'not_queued' %}selected{% endif %}>Не в очереди</option>
+          <option value="ready" {% if filters.queue == 'ready' %}selected{% endif %}>Есть черновик</option>
+          <option value="queued" {% if filters.queue == 'queued' %}selected{% endif %}>В очереди</option>
+          <option value="processing" {% if filters.queue == 'processing' %}selected{% endif %}>В работе</option>
+          <option value="failed" {% if filters.queue == 'failed' %}selected{% endif %}>С ошибкой</option>
+          <option value="sent" {% if filters.queue == 'sent' %}selected{% endif %}>Отправленные</option>
+        </select>
+      </label>
+      <label>
+        Вопросов на странице
+        <select name="page_size">
+          {% for size in page_size_options %}
+            <option value="{{ size }}" {% if filters.page_size == size %}selected{% endif %}>{{ size }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="checkbox-inline">
+        <input type="checkbox" name="hide_submitted" value="1" {% if filters.hide_submitted %}checked{% endif %}>
+        Скрывать уже отправленные
+      </label>
+      <div class="actions" style="margin:0; justify-content:flex-end;">
+        <button class="btn-secondary" type="submit">Применить</button>
+        <a class="button-link btn-light" href="{{ url_for('questions', tenant_id=active_tenant_id, mode='questions') }}">Сбросить</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card sticky-actions" style="margin-bottom:16px;">
+    <div class="actions" style="margin-bottom:0; justify-content:space-between; align-items:flex-start;">
+      <div class="actions" style="margin-bottom:0;">
+        <form method="post" action="/questions/refresh" class="actions" style="margin-bottom:0;">
+          <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+          <input type="hidden" name="page" value="{{ page }}">
+          <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+          <input type="hidden" name="sort" value="{{ filters.sort }}">
+          <input type="hidden" name="draft" value="{{ filters.draft }}">
+          <input type="hidden" name="queue" value="{{ filters.queue }}">
+          <input type="hidden" name="q" value="{{ filters.q }}">
+          <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+          <input type="hidden" name="mode" value="{{ filters.mode }}">
+          <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+          <button class="btn-light" type="submit">Обновить вопросы из WB</button>
+        </form>
+
+        <form method="post" action="/questions/export-clustering" class="actions" style="margin-bottom:0;">
+          <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+          <input type="hidden" name="page" value="{{ page }}">
+          <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+          <input type="hidden" name="sort" value="{{ filters.sort }}">
+          <input type="hidden" name="draft" value="{{ filters.draft }}">
+          <input type="hidden" name="queue" value="{{ filters.queue }}">
+          <input type="hidden" name="q" value="{{ filters.q }}">
+          <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+          <input type="hidden" name="mode" value="{{ filters.mode }}">
+          <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+          <label class="checkbox-inline" style="margin-top:0;">
+            <input type="checkbox" name="refresh_all" value="1">
+            Сначала обновить все кабинеты
+          </label>
+          <button class="btn-light" type="submit">Выгрузить всё для кластеризации (ZIP: XLSX + CSV)</button>
+        </form>
+
+        <form method="post" action="/questions/import-clustering" enctype="multipart/form-data" class="actions" style="margin-bottom:0; align-items:flex-end;">
+          <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+          <input type="hidden" name="page" value="{{ page }}">
+          <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+          <input type="hidden" name="sort" value="{{ filters.sort }}">
+          <input type="hidden" name="draft" value="{{ filters.draft }}">
+          <input type="hidden" name="queue" value="{{ filters.queue }}">
+          <input type="hidden" name="q" value="{{ filters.q }}">
+          <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+          <input type="hidden" name="mode" value="{{ filters.mode }}">
+          <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+          <label>
+            Обратный импорт cluster_map
+            <input type="file" name="cluster_import_file" accept=".zip,.xlsx,.xlsm,.csv" required>
+          </label>
+          <label class="checkbox-inline" style="margin-top:0;">
+            <input type="checkbox" name="clear_previous_imported" value="1" checked>
+            Сначала снять прошлые импортированные назначения
+          </label>
+          <label class="checkbox-inline" style="margin-top:0;">
+            <input type="checkbox" name="overwrite_manual" value="1">
+            Перезаписать ручные подгруппы
+          </label>
+          <button class="btn-secondary" type="submit">Импортировать cluster_map обратно в программу</button>
+        </form>
+
+        <form method="post" action="/questions/process" class="actions" style="margin-bottom:0;">
+          <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+          <input type="hidden" name="page" value="{{ page }}">
+          <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+          <input type="hidden" name="sort" value="{{ filters.sort }}">
+          <input type="hidden" name="draft" value="{{ filters.draft }}">
+          <input type="hidden" name="queue" value="{{ filters.queue }}">
+          <input type="hidden" name="q" value="{{ filters.q }}">
+          <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+          <input type="hidden" name="mode" value="{{ filters.mode }}">
+          <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+          <label>
+            Взять из очереди
+            <input type="number" name="max_items" value="0" min="0" style="width:110px;">
+          </label>
+          <label class="checkbox-inline" style="margin-top:0;">
+            <input type="checkbox" name="auto_only" value="1">
+            Только auto-ready
+          </label>
+          <button class="btn-danger" type="submit">Отправить очередь по API</button>
+        </form>
+      </div>
+
+      <div class="small muted" style="margin-top:10px;">Экспорт соберёт все неотвеченные вопросы из всех включённых кабинетов в один архив. После внешней кластеризации загрузи обратно .zip / .xlsx / .csv с листом <b>cluster_map</b>: программа разложит cluster_key и cluster_title по нужным tenant’ам и покажет вопросы уже подряд по импортированным кластерам.</div>
+
+      <details>
+        <summary>Автообработка и общий промпт</summary>
+        <div class="form-grid" style="margin-top:12px;">
+          <form method="post" action="/questions/auto-run" class="card" style="box-shadow:none; padding:0; margin:0;">
+            <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+            <input type="hidden" name="mode" value="{{ filters.mode }}">
+            <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+            <div class="actions" style="margin-bottom:10px;">
+              <label>
+                Лимит вопросов
+                <input type="number" name="max_items" value="0" min="0" style="width:110px;">
+              </label>
+              <label class="checkbox-inline" style="margin-top:0;">
+                <input type="checkbox" name="send_now" value="1">
+                Сразу отправлять
+              </label>
+            </div>
+            <button class="btn-light" type="submit">Запустить автообработку</button>
+          </form>
+          <form method="post" action="/questions/prompt" class="card" style="box-shadow:none; padding:0; margin:0;">
+            <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+            <input type="hidden" name="mode" value="{{ filters.mode }}">
+            <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+            <label>Общий промпт для AI-ответов
+              <textarea name="question_prompt_text" rows="8">{{ question_prompt_text }}</textarea>
+            </label>
+            <button class="btn-primary" type="submit">Сохранить промпт</button>
+          </form>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  {% if filters.mode == 'clusters' %}
+    {% if clusters %}
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Кластер</th>
+              <th>Примеры вопросов</th>
+              <th>Артикулы</th>
+              <th>Черновики</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in clusters %}
+            <tr>
+              <td>
+                <b>{{ c.title }}</b><br>
+                <span class="small muted">Ключ: {{ c.key }}</span><br>
+                <span class="badge">Вопросов: {{ c.count }}</span>
+                <span class="badge">Товаров: {{ c.article_count }}</span>
+              </td>
+              <td>
+                <ul style="margin:0; padding-left:18px;">
+                  {% for sample in c.sample_questions[:5] %}
+                    <li>{{ sample }}</li>
+                  {% endfor %}
+                </ul>
+              </td>
+              <td>
+                {% for article, cnt in c.articles %}
+                  <span class="badge">{{ article }} — {{ cnt }}</span>
+                {% endfor %}
+              </td>
+              <td>
+                <span class="badge badge-purple">Черновиков: {{ c.with_draft }}</span>
+                <span class="badge {% if c.auto_ready %}badge-ok{% else %}badge-status{% endif %}">Auto-ready: {{ c.auto_ready }}</span>
+                {% if c.primary_rule %}<div class="small muted">{{ c.primary_rule.title or c.primary_rule.id }}</div>{% endif %}
+              </td>
+              <td>
+                <div class="actions" style="margin-bottom:0;">
+                  <a class="button-link btn-primary" href="{{ url_for('questions', tenant_id=active_tenant_id, mode='questions', cluster=c.key, sort='cluster', page_size=filters.page_size, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">Открыть в ленте</a>
+                  <form method="post" action="/questions/prepare" style="margin:0;">
+                    <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+                    <input type="hidden" name="page" value="{{ page }}">
+                    <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+                    <input type="hidden" name="sort" value="cluster">
+                    <input type="hidden" name="draft" value="{{ filters.draft }}">
+                    <input type="hidden" name="queue" value="{{ filters.queue }}">
+                    <input type="hidden" name="q" value="{{ filters.q }}">
+                    <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+                    <input type="hidden" name="mode" value="questions">
+                    <input type="hidden" name="cluster" value="{{ c.key }}">
+                    <input type="hidden" name="cluster_key" value="{{ c.key }}">
+                    <input type="hidden" name="scope" value="cluster">
+                    <input type="hidden" name="force" value="1">
+                    <button class="btn-secondary" type="submit">Перегенерировать кластер</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">
+        <h3 style="margin-top:0;">Кластеры по текущим фильтрам не найдены</h3>
+        <div class="muted">Попробуйте сбросить фильтры или обновить вопросы из WB.</div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="helper">
+      <b>Как работать быстро:</b> менеджер пишет короткий комментарий по строке, строка автоматически отмечается галочкой, затем одна кнопка формирует подробные черновики по всем отмеченным вопросам. После проверки готовые строки можно сразу поставить в очередь.
+    </div>
+
+    {% if rows %}
+      <form method="post" id="question-selection-form">
+        <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+        <input type="hidden" name="page" value="{{ page }}">
+        <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+        <input type="hidden" name="sort" value="{{ filters.sort }}">
+        <input type="hidden" name="draft" value="{{ filters.draft }}">
+        <input type="hidden" name="queue" value="{{ filters.queue }}">
+        <input type="hidden" name="q" value="{{ filters.q }}">
+        <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+        <input type="hidden" name="mode" value="questions">
+        <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+        <input type="hidden" name="force" id="question-force-flag" value="">
+
+        <div class="toolbar">
+          <div class="actions" style="margin-bottom:0;">
+            <button class="btn-secondary" formaction="/questions/prepare" formmethod="post" type="submit">Сохранить комментарии и правки • Сформировать выбранные черновики</button>
+            <button class="btn-primary" formaction="/questions/queue" formmethod="post" type="submit">Добавить отмеченные в очередь</button>
+          </div>
+          <div class="checkbox-tools">
+            <button type="button" class="btn-light" onclick="setAllVisible(true)">Выделить все на странице</button>
+            <button type="button" class="btn-light" onclick="setAllVisible(false)">Снять все</button>
+            <button type="button" class="btn-light" onclick="invertVisible()">Инвертировать</button>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <table class="compact-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="master-checkbox" onclick="toggleMaster(this)"></th>
+                <th>Товар / кластер</th>
+                <th>Вопрос</th>
+                <th>Комментарий менеджера</th>
+                <th>Черновик ответа</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set ns = namespace(last_cluster='') %}
+              {% for r in rows %}
+                {% if filters.sort == 'cluster' and (loop.first or ns.last_cluster != r.cluster_key) %}
+                  <tr class="cluster-row">
+                    <td colspan="6">
+                      {{ r.cluster_title }}
+                      <span class="cluster-meta">Ключ: {{ r.cluster_key }}</span>
+                      <a class="btn-linkish" style="margin-left:12px;" href="{{ url_for('questions', tenant_id=active_tenant_id, mode='questions', cluster=r.cluster_key, sort='cluster', page_size=filters.page_size, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">Открыть только этот кластер</a>
+                    </td>
+                  </tr>
+                {% endif %}
+                {% set ns.last_cluster = r.cluster_key %}
+              <tr>
+                <td>
+                  <input type="checkbox" class="row-checkbox" name="selected_ids" value="{{ r.id }}">
+                </td>
+                <td>
+                  <b>{{ r.product_name or '—' }}</b><br>
+                  <span class="small muted">Арт.: {{ r.supplier_article or '—' }}</span><br>
+                  <span class="small muted">nmID: {{ r.nm_id or '—' }}</span><br>
+                  <span class="small muted">{{ r.created_date or '—' }}</span>
+                  {% if filters.sort != 'cluster' %}<br><span class="badge badge-status">{{ r.cluster_title }}</span>{% endif %}
+                  {% if r.rule_title %}<br><span class="badge badge-ai">{{ r.rule_title }}</span>{% endif %}
+                </td>
+                <td>
+                  <div class="question-box">{{ r.question_text }}</div>
+                  {% if r.answer_text %}
+                    <div class="small muted" style="margin-top:8px;">Текущий ответ WB: {{ r.answer_text }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <input type="hidden" name="action__{{ r.id }}" id="action__{{ r.id }}" value="answer">
+                  <textarea class="comment-area manager-comment-input" data-question-id="{{ r.id }}" name="manager_comment__{{ r.id }}" placeholder="Короткий комментарий менеджера: да, нет, скоро, ждите, в комплекте, в карточке, по артикулу ...">{{ r.manager_comment }}</textarea>
+                  <div class="quick-pills">
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Да');">Да</button>
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Нет');">Нет</button>
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Скоро');">Скоро</button>
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Ждите');">Ждите</button>
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Карточка');">Карточка</button>
+                    <button type="button" onclick="fillComment('{{ r.id }}', 'Комплект');">Комплект</button>
+                  </div>
+                  <div class="row-buttons">
+                    <button type="button" class="btn-danger" onclick="submitIgnoreRow('{{ r.id }}')">Не хочу отвечать</button>
+                  </div>
+                </td>
+                <td>
+                  <textarea class="reply-area reply-editor-input" data-question-id="{{ r.id }}" name="reply__{{ r.id }}" placeholder="Здесь будет подробный ответ ИИ или ваш ручной текст">{{ r.draft_reply }}</textarea>
+                  {% if r.draft_stale %}<div><span class="badge badge-warn">нужно перегенерировать</span></div>{% endif %}
+                  {% if r.draft_auto_ready %}<div><span class="badge badge-ok">auto-ready</span></div>{% endif %}
+                  {% if r.draft_explanation %}<div class="small muted" style="margin-top:6px;">{{ r.draft_explanation }}</div>{% endif %}
+                  {% if r.cross_sell_items %}<div class="small muted" style="margin-top:6px;">Рекомендации: {{ r.cross_sell_items|join('; ') }}</div>{% endif %}
+                </td>
+                <td>
+                  <div class="status-stack">
+                    {% if r.queue_status %}<div><span class="badge badge-status">{{ r.queue_status }}</span></div>{% endif %}
+                    {% if r.archive_status %}<div><span class="badge badge-ok">{{ r.archive_status }}</span></div>{% endif %}
+                    {% if r.queue_error %}<div class="small muted">{{ r.queue_error }}</div>{% endif %}
+                    {% if r.archive_sent_at %}<div class="small muted">Отправлен: {{ r.archive_sent_at }}</div>{% elif r.queue_sent_at %}<div class="small muted">Отправлен: {{ r.queue_sent_at }}</div>{% endif %}
+                    {% if r.draft_source %}<div class="small muted">Источник: {{ r.draft_source }}</div>{% endif %}
+                    {% if r.draft_confidence %}<div class="small muted">Уверенность: {{ '%.3f'|format(r.draft_confidence) }}</div>{% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <details style="margin-top:14px;">
+          <summary>Дополнительные действия по кластеру</summary>
+          <div class="form-grid" style="margin-top:12px;">
+            <label>Название нового подкластера
+              <input type="text" name="new_cluster_title" placeholder="Например: Размеры — Kolb 1517">
+            </label>
+          </div>
+          <div class="actions" style="margin-top:12px; margin-bottom:0;">
+            <button class="btn-ghost" formaction="/questions/cluster/reassign" formmethod="post" type="submit">Перенести выбранные в новый подкластер</button>
+            <button class="btn-ghost" formaction="/questions/cluster/reset" formmethod="post" type="submit">Сбросить ручную группировку у выбранных</button>
+            {% if filters.cluster %}
+            <button class="btn-ghost" formaction="/questions/cluster/auto-split" formmethod="post" type="submit" name="cluster_key" value="{{ filters.cluster }}">Авторазнести текущий кластер по артикулам</button>
+            {% endif %}
+          </div>
+        </details>
+      </form>
+
+      <details class="card" style="margin-top:16px;">
+        <summary>Расширенная настройка правила для текущего кластера</summary>
+        {% if filters.cluster and selected_cluster %}
+          <form method="post" action="/questions/rule/save" enctype="multipart/form-data" style="margin-top:12px;">
+            <input type="hidden" name="tenant_id" value="{{ active_tenant_id }}">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="page_size" value="{{ filters.page_size }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_submitted" value="{{ 1 if filters.hide_submitted else 0 }}">
+            <input type="hidden" name="mode" value="questions">
+            <input type="hidden" name="cluster" value="{{ filters.cluster }}">
+            <input type="hidden" name="cluster_key" value="{{ filters.cluster }}">
+            <input type="hidden" name="rule_id" value="{{ selected_cluster_rule.id or '' }}">
+            <input type="hidden" name="enabled" value="1">
+            <div class="toolbar" style="margin-bottom:12px;">
+              <div>
+                <h3 style="margin:0 0 8px 0;">{{ selected_cluster.title }}</h3>
+                <div class="small muted">Этот блок нужен для случаев, когда по целому кластеру удобнее задать общую логику или исключения по артикулам.</div>
+              </div>
+              <div class="actions" style="margin-bottom:0;">
+                <button class="btn-primary" type="submit">Сохранить правило</button>
+                <button class="btn-secondary" type="submit" name="after_save" value="generate_cluster">Сохранить и перегенерировать кластер</button>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>Название правила
+                <input type="text" name="title" value="{{ selected_cluster_rule.title or selected_cluster.title }}">
+              </label>
+              <label>Режим ответа
+                {% set answer_mode = selected_cluster_rule.answer_mode or 'ai' %}
+                <select name="answer_mode">
+                  <option value="ai" {% if answer_mode == 'ai' %}selected{% endif %}>AI по инструкции</option>
+                  <option value="template" {% if answer_mode == 'template' %}selected{% endif %}>Готовый шаблон</option>
+                  <option value="reject" {% if answer_mode == 'reject' %}selected{% endif %}>Отклонять вопрос</option>
+                  <option value="skip" {% if answer_mode == 'skip' %}selected{% endif %}>Не отвечать / пропускать</option>
+                </select>
+              </label>
+              <label>Приоритет
+                <input type="number" name="priority" value="{{ selected_cluster_rule.priority or 100 }}" min="1" max="9999">
+              </label>
+              <label style="justify-content:end;">
+                <span>Автоотправка для уверенных совпадений</span>
+                <label style="display:flex; flex-direction:row; align-items:center; gap:8px; margin-top:10px;">
+                  <input type="checkbox" name="allow_auto_send" value="1" {% if selected_cluster_rule.allow_auto_send %}checked{% endif %}>
+                  Разрешить auto-send
+                </label>
+              </label>
+            </div>
+            <div style="margin-top:12px;">
+              <label>Инструкция менеджера для ИИ
+                <textarea class="rule-area" name="manager_instruction" placeholder="Например: если в вопросе спрашивают о наличии камушков в комплекте, отвечать так-то; если в артикуле есть Kolb 1517 — использовать конкретные размеры и формулировки.">{{ selected_cluster_rule.manager_instruction or '' }}</textarea>
+              </label>
+            </div>
+            <div style="margin-top:12px;">
+              <label>Готовый шаблон ответа / текст для отклонения
+                <textarea name="answer_template" placeholder="Используется, если выбран режим «Готовый шаблон» или «Отклонять вопрос».">{{ selected_cluster_rule.answer_template or '' }}</textarea>
+              </label>
+            </div>
+            <div class="form-grid" style="margin-top:12px;">
+              <label>Справочный файл
+                <input type="file" name="reference_file" accept=".txt,.md,.json,.csv,.docx,.xlsx,.xlsm,.pdf">
+              </label>
+              <label>Любое из слов в вопросе
+                <input type="text" name="question_keywords_any" value="{{ (selected_cluster_rule.question_keywords_any or [])|join(', ') }}" placeholder="мутная, грязная, царапина">
+              </label>
+              <label>Все слова в вопросе
+                <input type="text" name="question_keywords_all" value="{{ (selected_cluster_rule.question_keywords_all or [])|join(', ') }}" placeholder="диаметр, высота">
+              </label>
+              <label>Любое из слов в артикуле
+                <input type="text" name="article_keywords_any" value="{{ (selected_cluster_rule.article_keywords_any or [])|join(', ') }}" placeholder="Pshenitsa, Kolb">
+              </label>
+              <label>Все слова в артикуле
+                <input type="text" name="article_keywords_all" value="{{ (selected_cluster_rule.article_keywords_all or [])|join(', ') }}" placeholder="Kolb, 1517">
+              </label>
+            </div>
+          </form>
+        {% else %}
+          <div class="small muted" style="margin-top:12px;">Чтобы отредактировать правило по кластеру, открой только один кластер из ленты или из режима «Кластеры».</div>
+        {% endif %}
+      </details>
+    {% else %}
+      <div class="empty">
+        <h3 style="margin-top:0;">Подходящих вопросов по текущим фильтрам не найдено</h3>
+        <div class="muted">Попробуйте сбросить фильтры или обновить снимок из WB.</div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="pagination">
+    <div class="muted small">Страница {{ page }} из {{ page_count }} · Показано {{ rows|length if rows is defined else 0 }} из {{ total_filtered }}</div>
+    <div class="actions" style="margin-bottom:0;">
+      {% if has_prev %}
+        <a class="button-link btn-light" href="{{ url_for('questions', tenant_id=active_tenant_id, mode=filters.mode, cluster=filters.cluster, page=page-1, page_size=filters.page_size, sort=filters.sort, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">← Предыдущая</a>
+      {% endif %}
+      {% if has_next %}
+        <a class="button-link btn-light" href="{{ url_for('questions', tenant_id=active_tenant_id, mode=filters.mode, cluster=filters.cluster, page=page+1, page_size=filters.page_size, sort=filters.sort, draft=filters.draft, queue=filters.queue, q=filters.q, hide_submitted=1 if filters.hide_submitted else 0) }}">Следующая →</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+const questionSelectionKey = 'questions-panel-selected-ids';
+function rowCheckboxes() {
+  return Array.from(document.querySelectorAll('.row-checkbox'));
+}
+function getSelectedSet() {
+  try {
+    const data = JSON.parse(localStorage.getItem(questionSelectionKey) || '[]');
+    return new Set(Array.isArray(data) ? data : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+function saveSelectedSet() {
+  const ids = rowCheckboxes().filter(cb => cb.checked).map(cb => cb.value);
+  localStorage.setItem(questionSelectionKey, JSON.stringify(ids));
+}
+function restoreSelectedSet() {
+  const selected = getSelectedSet();
+  rowCheckboxes().forEach(cb => { cb.checked = selected.has(cb.value); });
+  syncMaster();
+}
+function syncMaster() {
+  const boxes = rowCheckboxes();
+  const checked = boxes.filter(x => x.checked).length;
+  const master = document.getElementById('master-checkbox');
+  if (!master) return;
+  master.checked = boxes.length > 0 && checked === boxes.length;
+  master.indeterminate = checked > 0 && checked < boxes.length;
+}
+function setAllVisible(state) {
+  rowCheckboxes().forEach(cb => cb.checked = state);
+  saveSelectedSet();
+  syncMaster();
+}
+function invertVisible() {
+  rowCheckboxes().forEach(cb => cb.checked = !cb.checked);
+  saveSelectedSet();
+  syncMaster();
+}
+function toggleMaster(master) {
+  setAllVisible(master.checked);
+}
+function getNamedElement(name) {
+  const items = document.getElementsByName(name);
+  return items && items.length ? items[0] : null;
+}
+function markRowSelected(id) {
+  const box = document.querySelector('.row-checkbox[value="' + id + '"]');
+  if (!box) return;
+  box.checked = true;
+  saveSelectedSet();
+  syncMaster();
+}
+function removeRowFromSelection(id) {
+  const selected = getSelectedSet();
+  selected.delete(id);
+  localStorage.setItem(questionSelectionKey, JSON.stringify(Array.from(selected)));
+}
+function fillComment(id, text) {
+  const area = getNamedElement('manager_comment__' + id);
+  if (!area) return;
+  const current = area.value.trim();
+  const quickValues = ['да','нет','скоро','ждите','карточка','комплект'];
+  if (!current || quickValues.includes(current.toLowerCase())) {
+    area.value = text;
+  } else {
+    area.value = current.endsWith('.') ? (current + ' ' + text) : (current + '. ' + text);
+  }
+  markRowSelected(id);
+  area.focus();
+}
+function submitIgnoreRow(id) {
+  if (!confirm('Удалить этот вопрос из рабочей ленты и больше к нему не возвращаться?')) return;
+  const form = document.getElementById('question-selection-form');
+  if (!form) return;
+  removeRowFromSelection(id);
+  const forceInput = document.getElementById('question-force-flag');
+  if (forceInput) forceInput.value = '';
+  let hidden = document.getElementById('ignore-question-id');
+  if (!hidden) {
+    hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'question_id';
+    hidden.id = 'ignore-question-id';
+    form.appendChild(hidden);
+  }
+  hidden.value = id;
+  form.action = '/questions/ignore';
+  form.method = 'post';
+  form.submit();
+}
+document.addEventListener('change', function(e) {
+  if (e.target.classList.contains('row-checkbox')) {
+    saveSelectedSet();
+    syncMaster();
+  }
+});
+document.addEventListener('submit', function(e) {
+  if (e.target && e.target.id === 'question-selection-form') {
+    const currentAction = (e.target.getAttribute('action') || '').toString();
+    const submitterAction = e.submitter ? (e.submitter.getAttribute('formaction') || '') : '';
+    const isIgnore = currentAction.includes('/questions/ignore') || submitterAction === '/questions/ignore';
+    if (!isIgnore) {
+      saveSelectedSet();
+    }
+    const forceInput = document.getElementById('question-force-flag');
+    if (forceInput && (!e.submitter || e.submitter.getAttribute('formaction') !== '/questions/prepare')) {
+      forceInput.value = '';
+    }
+  }
+});
+document.addEventListener('DOMContentLoaded', function(){
+  restoreSelectedSet();
+  document.querySelectorAll('.manager-comment-input, .reply-editor-input').forEach(function(el){
+    const id = el.getAttribute('data-question-id');
+    if (!id) return;
+    el.addEventListener('input', function(){
+      if (this.value.trim()) {
+        markRowSelected(id);
+      }
+    });
+  });
+  const tenantId = {{ active_tenant_id|tojson }};
+  if(!tenantId) return;
+  document.querySelectorAll('form').forEach(function(form){
+    if(form.querySelector('input[name="tenant_id"]')) return;
+    const input=document.createElement('input');
+    input.type='hidden'; input.name='tenant_id'; input.value=tenantId;
+    form.appendChild(input);
+  });
+  document.querySelectorAll('a[href]').forEach(function(a){
+    const href=a.getAttribute('href');
+    if(!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+    if(href.includes('tenant_id=')) return;
+    try{
+      const url = new URL(href, window.location.origin);
+      if(url.origin !== window.location.origin) return;
+      url.searchParams.set('tenant_id', tenantId);
+      a.setAttribute('href', url.pathname + url.search + url.hash);
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диагностика / Логи</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1800px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.nav { display:flex; gap:14px; flex-wrap:wrap; }
+.nav a { color:#2563eb; text-decoration:none; font-weight:700; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); padding:16px; margin-bottom:16px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+.filters { display:grid; grid-template-columns: repeat(4, minmax(180px, 1fr)) auto; gap:10px; align-items:end; }
+label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+select,input { padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; background:#fff; }
+button,.button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-light { background:#f3f4f6; color:#111827; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+pre { white-space:pre-wrap; word-break:break-word; margin:0; }
+.table-wrap { overflow:auto; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:8px 10px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+th { background:#fff; position:sticky; top:0; }
+.small { font-size:12px; color:#6b7280; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1 style="margin:0 0 8px 0;">Диагностика / Логи</h1>
+      <div class="small">Безопасные логи без паролей, токенов, cookies и телефонов. Эти файлы можно присылать для диагностики.</div>
+    </div>
+    <div class="nav">
+      <a href="/{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Ответы</a>
+      <a href="/complaints{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Жалобы</a>
+      <a href="/questions{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Вопросы</a>
+      <a href="/analytics{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Аналитика</a>
+      <a href="/automation{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Автоматизация</a>
+      {% if avito_module_enabled %}<a href="/avito{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Avito</a>{% endif %}
+      <a href="/tenants{{ '?tenant_id=' + active_tenant_id if active_tenant_id else '' }}">Кабинеты</a> {% if app_auth_enabled and current_user %}<a href="/logout">Выход ({{ current_user }})</a>{% endif %}
+    </div>
+  </div>
+  <div class="grid">
+    <div class="card"><b>Всего записей:</b><br>{{ stats.total }}</div>
+    <div class="card"><b>Каналов:</b><br>{{ stats.by_channel|length }}</div>
+    <div class="card"><b>Уровней:</b><br>{{ stats.by_level|length }}</div>
+  </div>
+  <div class="card">
+    <form method="get" action="/diagnostics" class="filters">
+      <label>Кабинет
+        <select name="tenant">
+          {% for tenant in tenant_options %}
+          <option value="{{ tenant }}" {% if tenant_filter == tenant %}selected{% endif %}>{{ tenant }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Канал
+        <select name="channel">
+          {% for channel in channel_options %}
+          <option value="{{ channel }}" {% if channel_filter == channel %}selected{% endif %}>{{ channel }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Лимит
+        <select name="limit">
+          {% for n in [100,300,500,1000,2000] %}
+          <option value="{{ n }}" {% if limit == n %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div></div>
+      <button class="btn-primary" type="submit">Показать</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0;">Сводка</h3>
+    <div><b>По каналам:</b>
+      {% for key, value in stats.by_channel.items() %}<span class="badge">{{ key }}: {{ value }}</span>{% endfor %}
+    </div>
+    <div style="margin-top:8px;"><b>По уровням:</b>
+      {% for key, value in stats.by_level.items() %}<span class="badge">{{ key }}: {{ value }}</span>{% endfor %}
+    </div>
+    <div style="margin-top:8px;"><b>Частые события:</b>
+      {% for key, value in stats.top_events %}<span class="badge">{{ key }}: {{ value }}</span>{% endfor %}
+    </div>
+  </div>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Время</th><th>Кабинет</th><th>Канал</th><th>Событие</th><th>Уровень</th><th>Данные</th></tr></thead>
+      <tbody>
+        {% for row in entries %}
+        <tr>
+          <td class="small">{{ row.ts }}</td>
+          <td>{{ row.tenant_id or '_system' }}</td>
+          <td>{{ row.channel }}</td>
+          <td>{{ row.event }}</td>
+          <td>{{ row.level }}</td>
+          <td><pre>{{ row.data | tojson(indent=2) }}</pre></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="small">Логи пока пусты.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ответы на отзывы</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; color:#1f2937; }
+.wrap { max-width: 1700px; margin:0 auto; padding:24px; }
+.header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.nav { display:flex; gap:14px; flex-wrap:wrap; }
+.nav a { color:#2563eb; text-decoration:none; font-weight:700; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+.card,.table-card,.empty { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(15,23,42,.08); }
+.card,.table-card { padding:16px; }
+.empty { padding:24px; text-align:center; }
+.flash { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+.flash-success { background:#ecfdf5; color:#065f46; }
+.flash-error { background:#fef2f2; color:#991b1b; }
+.muted { color:#6b7280; }
+button, .button-link { border:none; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+.btn-primary { background:#2563eb; color:#fff; }
+.btn-secondary { background:#eef2ff; color:#1e3a8a; }
+.btn-danger { background:#7c2d12; color:#fff; }
+.btn-light { background:#f3f4f6; color:#111827; }
+.actions { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+.filters { display:grid; grid-template-columns: 1.5fr repeat(7,minmax(120px, 220px)) auto auto; gap:10px; align-items:end; }
+.filters label { display:flex; flex-direction:column; gap:6px; font-size:13px; color:#374151; }
+.filters input[type="text"], .filters select, .filters input[type="number"], textarea { padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; background:#fff; }
+.filters .checkbox-inline { display:flex; align-items:center; gap:8px; flex-direction:row; margin-top:24px; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+th { position: sticky; top: 0; background:#fff; z-index: 1; }
+.review-box { white-space:pre-wrap; max-width:520px; }
+.small { font-size:12px; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
+.pagination a { color:#2563eb; text-decoration:none; font-weight:700; }
+.checkbox-tools { display:flex; gap:8px; flex-wrap:wrap; }
+.sticky-actions { position: sticky; top: 8px; z-index: 2; }
+.badge { display:inline-block; background:#f3f4f6; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin:2px 4px 2px 0; }
+.badge-status { background:#f3f4f6; color:#374151; }
+.badge-ai { background:#e0e7ff; color:#1e3a8a; }
+textarea.reply-area { width:100%; min-height:120px; resize:vertical; }
+details summary { cursor:pointer; font-weight:700; }
+.sticky-col { min-width: 380px; }
+@media (max-width: 1180px) {
+  .filters { grid-template-columns: 1fr 1fr; }
+}
+
+.tenant-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px 0; }
+.tenant-tab { display:inline-flex; align-items:center; gap:6px; background:#fff; color:#111827; text-decoration:none; padding:8px 12px; border-radius:999px; font-weight:700; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+.tenant-tab.active { background:#2563eb; color:#fff; }
+.tenant-tab.manage { background:#eef2ff; color:#1e3a8a; }
+.tenant-subtitle { color:#6b7280; font-size:13px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if tenants_nav %}
+  <div class="tenant-tabs">
+    {% for tenant in tenants_nav %}
+      <a class="tenant-tab {% if tenant.id == active_tenant_id %}active{% endif %}" href="{{ request.path }}?tenant_id={{ tenant.id }}">{{ tenant.emoji or '🏢' }} {{ tenant.name }}</a>
+    {% endfor %}
+    <a class="tenant-tab manage" href="/tenants{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">⚙ Кабинеты</a>
+  </div>
+  {% if active_tenant %}<div class="tenant-subtitle">Активный кабинет: {{ active_tenant.emoji or '🏢' }} {{ active_tenant.name }}</div>{% endif %}
+  {% endif %}
+    <div class="header">
+        <div>
+            <h1 style="margin:0 0 8px 0;">Ответы на отзывы</h1>
+            <div class="muted">Панель ответов поддерживает новые отзывы, архивные отзывы без ответа и пустые оценки без текста. AI-генерация и отправка очередей вынесены в фон, поэтому интерфейс не блокируется во время тяжёлых операций.</div>
+        </div>
+        <div class="nav">
+            <a href="/complaints">К жалобам</a>
+            <a href="/complaints/effectiveness">Результативность жалоб</a>
+            <a href="/analytics">Аналитика</a>
+            <a href="/questions">Вопросы</a>
+            {% if avito_module_enabled %}<a href="/avito{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Avito</a>{% endif %}
+            <a href="/automation{% if active_tenant_id %}?tenant_id={{ active_tenant_id }}{% endif %}">Автоматизация</a>
+            <a href="/diagnostics">Диагностика / Логи</a>
+            {% if app_auth_enabled and current_user %}<a href="/logout">Выход ({{ current_user }})</a>{% endif %}
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card"><b>Неотвеченных в WB:</b><br>{{ count_unanswered }}</div>
+        <div class="card"><b>После фильтров:</b><br>{{ total_filtered }}</div>
+        <div class="card"><b>Скрыто как уже отправленные:</b><br>{{ submitted_hidden }}</div>
+        <div class="card"><b>AI-черновиков ответов:</b><br>{{ draft_count }}</div>
+        <div class="card"><b>Очередь ответов:</b><br>{{ reply_queue_open }}</div>
+        <div class="card"><b>Снимок обновлён:</b><br><span class="small">{{ snapshot_fetched_at or '—' }}</span></div>
+        <div class="card"><b>Историческая БД:</b><br>{{ history_counts.total if history_counts else 0 }}</div>
+        <div class="card"><b>Архивных без ответа:</b><br>{{ history_counts.archive if history_counts else 0 }}</div>
+        <div class="card"><b>Пустых оценок без ответа:</b><br>{{ history_counts.empty_unanswered if history_counts else 0 }}</div>
+        <div class="card"><b>Проверка полноты:</b><br>{% if history_meta and history_meta.verified_all %}<span style="color:#065f46;font-weight:700;">полная</span>{% elif history_meta and history_meta.status == 'running' %}<span style="color:#1d4ed8;font-weight:700;">идёт синхронизация</span>{% else %}<span style="color:#7c2d12;font-weight:700;">не проверена</span>{% endif %}</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if load_error %}
+        <div class="flash flash-error">Ошибка загрузки: {{ load_error }}</div>
+    {% endif %}
+
+    {% if background_jobs_latest %}
+    <div class="card" style="margin-bottom:16px;">
+        <b>Фоновые задачи</b>
+        <div class="small muted" style="margin-top:6px;">Показываются последние задачи по текущему кабинету.</div>
+        <div style="margin-top:10px; display:grid; gap:8px;">
+            {% for job in background_jobs_latest %}
+            <div>
+                <span class="badge badge-status">{{ job.kind }}</span>
+                <b>{{ job.label }}</b>
+                <span class="small muted">· {{ job.status }} · {{ job.updated_at or job.created_at }}</span>
+                {% if job.error %}<div class="small muted">Ошибка: {{ job.error }}</div>{% elif job.last_message %}<div class="small muted">{{ job.last_message }}</div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-bottom:16px;">
+        <div class="actions" style="margin-bottom:8px;">
+            <form method="post" action="/replies/history-sync/start">
+                <input type="hidden" name="page" value="{{ page }}">
+                <input type="hidden" name="sort" value="{{ filters.sort }}">
+                <input type="hidden" name="stars" value="{{ filters.stars }}">
+                <input type="hidden" name="draft" value="{{ filters.draft }}">
+                <input type="hidden" name="queue" value="{{ filters.queue }}">
+                <input type="hidden" name="q" value="{{ filters.q }}">
+                <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+                <button class="btn-primary" type="submit">Запустить полную историческую синхронизацию</button>
+            </form>
+            <form method="post" action="/replies/history-sync/stop">
+                <input type="hidden" name="page" value="{{ page }}">
+                <input type="hidden" name="sort" value="{{ filters.sort }}">
+                <input type="hidden" name="stars" value="{{ filters.stars }}">
+                <input type="hidden" name="draft" value="{{ filters.draft }}">
+                <input type="hidden" name="queue" value="{{ filters.queue }}">
+                <input type="hidden" name="q" value="{{ filters.q }}">
+                <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+                <button class="btn-light" type="submit">Остановить синхронизацию</button>
+            </form>
+            <form method="post" action="/replies/history-sync/check">
+                <input type="hidden" name="page" value="{{ page }}">
+                <input type="hidden" name="sort" value="{{ filters.sort }}">
+                <input type="hidden" name="stars" value="{{ filters.stars }}">
+                <input type="hidden" name="draft" value="{{ filters.draft }}">
+                <input type="hidden" name="queue" value="{{ filters.queue }}">
+                <input type="hidden" name="q" value="{{ filters.q }}">
+                <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+                <button class="btn-secondary" type="submit">Проверить полноту выгрузки</button>
+            </form>
+        </div>
+        <div id="history-sync-status" class="small muted">{% if history_meta %}Статус: {{ history_meta.status or '—' }} · Фаза: {{ history_meta.phase or '—' }} · Active {{ history_meta.active_imported or history_meta.db_active_rows or 0 }}/{{ history_meta.expected_active_unanswered or 0 }} · Archive {{ history_meta.archive_imported or history_meta.db_archive_rows or 0 }}/{{ history_meta.expected_archive_total or 0 }}{% else %}Историческая синхронизация ещё не запускалась.{% endif %}</div>
+        <div class="small muted" style="margin-top:6px;">Active = текущие активные неотвеченные отзывы в обычном списке WB. Archive = архивные отзывы WB. Числа различаются у каждого кабинета, потому что у каждого ЛК своё количество активных и архивных отзывов.</div>
+        <div id="history-sync-extra" class="small muted" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+        <form method="get" action="/" class="filters">
+            <label>
+                Поиск
+                <input type="text" name="q" value="{{ filters.q }}" placeholder="товар, артикул, nmID, текст, пользователь">
+            </label>
+            <label>
+                Сортировка
+                <select name="sort">
+                    <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Сначала новые</option>
+                    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Сначала старые</option>
+                    <option value="stars_low" {% if filters.sort == 'stars_low' %}selected{% endif %}>Сначала 1★ → 5★</option>
+                    <option value="stars_high" {% if filters.sort == 'stars_high' %}selected{% endif %}>Сначала 5★ → 1★</option>
+                </select>
+            </label>
+            <label>
+                Оценка
+                <select name="stars">
+                    <option value="all" {% if filters.stars == 'all' %}selected{% endif %}>Все</option>
+                    {% for s in [1,2,3,4,5] %}
+                    <option value="{{ s }}" {% if filters.stars == s|string %}selected{% endif %}>Только {{ s }}★</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Черновик
+                <select name="draft">
+                    <option value="all" {% if filters.draft == 'all' %}selected{% endif %}>Все</option>
+                    <option value="with_draft" {% if filters.draft == 'with_draft' %}selected{% endif %}>Только с черновиком</option>
+                    <option value="without_draft" {% if filters.draft == 'without_draft' %}selected{% endif %}>Только без черновика</option>
+                </select>
+            </label>
+            <label>
+                Статус очереди
+                <select name="queue">
+                    <option value="all" {% if filters.queue == 'all' %}selected{% endif %}>Все</option>
+                    <option value="not_queued" {% if filters.queue == 'not_queued' %}selected{% endif %}>Не в очереди</option>
+                    <option value="ready" {% if filters.queue == 'ready' %}selected{% endif %}>С готовым черновиком</option>
+                    <option value="queued" {% if filters.queue == 'queued' %}selected{% endif %}>В очереди</option>
+                    <option value="processing" {% if filters.queue == 'processing' %}selected{% endif %}>В работе</option>
+                    <option value="failed" {% if filters.queue == 'failed' %}selected{% endif %}>С ошибкой</option>
+                    <option value="sent" {% if filters.queue == 'sent' %}selected{% endif %}>Уже отправленные</option>
+                </select>
+            </label>
+            <label>
+                Источник
+                <select name="source">
+                    <option value="all" {% if filters.source == 'all' %}selected{% endif %}>Все</option>
+                    <option value="active" {% if filters.source == 'active' %}selected{% endif %}>Активные</option>
+                    <option value="archive" {% if filters.source == 'archive' %}selected{% endif %}>Архивные</option>
+                </select>
+            </label>
+            <label>
+                Тип содержимого
+                <select name="content">
+                    <option value="all" {% if filters.content == 'all' %}selected{% endif %}>Все</option>
+                    <option value="empty_only" {% if filters.content == 'empty_only' %}selected{% endif %}>Только пустые оценки</option>
+                    <option value="with_content" {% if filters.content == 'with_content' %}selected{% endif %}>Только с текстом/плюсами/минусами</option>
+                </select>
+            </label>
+            <label>
+                Состояние ответа WB
+                <select name="answer_state">
+                    <option value="needs_reply" {% if filters.answer_state == 'needs_reply' %}selected{% endif %}>Только без ответа</option>
+                    <option value="all" {% if filters.answer_state == 'all' %}selected{% endif %}>Все</option>
+                    <option value="answered_only" {% if filters.answer_state == 'answered_only' %}selected{% endif %}>Только уже отвеченные</option>
+                </select>
+            </label>
+            <label>
+                На странице
+                <select name="page_size">
+                    {% for size in page_size_options %}
+                    <option value="{{ size }}" {% if (filters.page_size or page_size) == size %}selected{% endif %}>{{ size }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="checkbox-inline">
+                <input type="checkbox" name="hide_sent" value="1" {% if filters.hide_sent %}checked{% endif %}>
+                Скрывать уже отправленные
+            </label>
+            <div class="actions" style="margin:0; justify-content:flex-end;">
+                <button class="btn-secondary" type="submit">Применить</button>
+                <a class="button-link btn-light" href="/?tenant_id={{ active_tenant_id }}">Сбросить</a>
+                <a class="button-link btn-light" href="{{ url_for('index', page=page, sort=filters.sort, stars=filters.stars, draft=filters.draft, queue=filters.queue, q=filters.q, hide_sent=1 if filters.hide_sent else 0, source=filters.source, content=filters.content, answer_state=filters.answer_state, page_size=filters.page_size or page_size, refresh=1) }}">Обновить из WB</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+        <details>
+            <summary>Промпт для AI-генерации ответов</summary>
+            <form method="post" action="/replies/prompt" style="margin-top:12px;">
+                <input type="hidden" name="page" value="{{ page }}">
+                <input type="hidden" name="sort" value="{{ filters.sort }}">
+                <input type="hidden" name="stars" value="{{ filters.stars }}">
+                <input type="hidden" name="draft" value="{{ filters.draft }}">
+                <input type="hidden" name="queue" value="{{ filters.queue }}">
+                <input type="hidden" name="q" value="{{ filters.q }}">
+                <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+                <textarea name="prompt_text" rows="10" style="width:100%; resize:vertical;">{{ prompt_text }}</textarea>
+                <div class="actions" style="margin-top:10px; margin-bottom:0;">
+                    <button class="btn-primary" type="submit">Сохранить промпт</button>
+                    <span class="small muted">Файл сохраняется как текстовый и используется при следующей генерации ответа. Базовый пример: «Пиши вежливо».</span>
+                </div>
+            </form>
+        </details>
+    </div>
+
+    <div class="card sticky-actions" style="margin-bottom:16px;">
+        <form method="post" action="/replies/process" class="actions" style="margin-bottom:0;">
+            <input type="hidden" name="page" value="{{ page }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="stars" value="{{ filters.stars }}">
+            <input type="hidden" name="draft" value="{{ filters.draft }}">
+            <input type="hidden" name="queue" value="{{ filters.queue }}">
+            <input type="hidden" name="q" value="{{ filters.q }}">
+            <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+            <label>
+                Сколько ответов взять из очереди
+                <input type="number" name="max_items" value="0" min="0" style="width:110px;">
+            </label>
+            <span class="small muted">0 = отправить всю очередь по API</span>
+            <button class="btn-danger" type="submit">Отправить все ответы из очереди по API</button>
+        </form>
+    </div>
+
+    {% if rows %}
+    <form method="post" id="reply-selection-form">
+        <input type="hidden" name="page" value="{{ page }}">
+        <input type="hidden" name="sort" value="{{ filters.sort }}">
+        <input type="hidden" name="stars" value="{{ filters.stars }}">
+        <input type="hidden" name="draft" value="{{ filters.draft }}">
+        <input type="hidden" name="queue" value="{{ filters.queue }}">
+        <input type="hidden" name="q" value="{{ filters.q }}">
+        <input type="hidden" name="hide_sent" value="{{ 1 if filters.hide_sent else 0 }}">
+                <input type="hidden" name="source" value="{{ filters.source }}">
+                <input type="hidden" name="content" value="{{ filters.content }}">
+                <input type="hidden" name="answer_state" value="{{ filters.answer_state }}">
+                <input type="hidden" name="page_size" value="{{ filters.page_size or page_size }}">
+        <div class="toolbar">
+            <div class="actions" style="margin-bottom:0;">
+                <button id="btn-prepare-selected" class="btn-secondary" type="button" onclick="prepareSelectedReplies()">Подготовить AI-черновики для выбранных</button>
+                <button id="btn-queue-selected" class="btn-primary" type="button" onclick="queueSelectedReplies()">Добавить выбранные ответы в очередь</button>
+                <span id="bulk-status" class="small muted"></span>
+            </div>
+            <div class="checkbox-tools">
+                <button type="button" class="btn-light" onclick="setAllVisible(true)">Выделить все на странице</button>
+                <button type="button" class="btn-light" onclick="setAllVisible(false)">Снять все</button>
+                <button type="button" class="btn-light" onclick="invertVisible()">Инвертировать</button>
+            </div>
+        </div>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:56px;"><input type="checkbox" id="master-checkbox" onclick="toggleMaster(this)"></th>
+                        <th>Оценка</th>
+                        <th>Товар</th>
+                        <th>Отзыв</th>
+                        <th class="sticky-col">Черновик ответа</th>
+                        <th>Очередь / статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="row-checkbox" name="selected_ids" value="{{ r.id }}">
+                        </td>
+                        <td><b>{{ r.stars_view }}</b><br><span class="small muted">{{ r.stars }}★</span></td>
+                        <td>
+                            <b>{{ r.product_name }}</b><br>
+                            <span class="small muted">Арт.: {{ r.supplier_article or '—' }}</span><br>
+                            <span class="small muted">nmID: {{ r.nm_id or '—' }}</span><br>
+                            <span class="small muted">{{ r.user_name or '—' }} · {{ r.created_date or '—' }}</span><br>{% if r.source %}<span class="badge badge-status">{{ "Архив" if r.source == "archive" else "Активный" }}</span>{% endif %}{% if r.is_empty_rating_only %}<span class="badge badge-status">Пустая оценка</span>{% endif %}{% if r.has_wb_answer %}<span class="badge badge-status">Уже отвечен в WB</span>{% endif %}
+                        </td>
+                        <td><div class="review-box">{{ r.review_text }}</div></td>
+                        <td>
+                            {% if r.has_draft %}<div><span class="badge badge-ai">{{ 'AI готов' if r.reply else 'Черновик' }}</span></div>{% endif %}
+                            <textarea class="reply-area" name="reply__{{ r.id }}" placeholder="Тут будет текст ответа AI или ваш ручной текст">{{ r.reply }}</textarea>
+                        </td>
+                        <td>
+                            {% if r.queue_status %}<div><span class="badge badge-status">{{ r.queue_status }}</span></div>{% endif %}
+                            {% if r.archive_status in ['sent','success','submitted'] %}<div><span class="badge badge-status">{{ r.archive_status }}</span></div>{% endif %}
+                            {% if r.queue_error %}<div class="small muted">{{ r.queue_error }}</div>{% endif %}
+                            {% if r.archive_sent_at %}<div class="small muted">Отправлен: {{ r.archive_sent_at }}</div>{% elif r.queue_sent_at %}<div class="small muted">Отправлен: {{ r.queue_sent_at }}</div>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+    {% else %}
+    <div class="empty">
+        <h3 style="margin-top:0;">Подходящих отзывов по текущим фильтрам не найдено</h3>
+        <div class="muted">Попробуйте сбросить фильтры или обновить снимок из WB.</div>
+    </div>
+    {% endif %}
+
+    <div class="pagination">
+        <div class="muted small">Страница {{ page }} из {{ page_count }} · Показано {{ rows|length }} из {{ total_filtered }}</div>
+        <div class="actions" style="margin-bottom:0;">
+            {% if has_prev %}
+                <a class="button-link btn-light" href="{{ url_for('index', page=page-1, sort=filters.sort, stars=filters.stars, draft=filters.draft, queue=filters.queue, q=filters.q, hide_sent=1 if filters.hide_sent else 0, source=filters.source, content=filters.content, answer_state=filters.answer_state, page_size=filters.page_size or page_size) }}">← Предыдущая</a>
+            {% endif %}
+            {% if has_next %}
+                <a class="button-link btn-light" href="{{ url_for('index', page=page+1, sort=filters.sort, stars=filters.stars, draft=filters.draft, queue=filters.queue, q=filters.q, hide_sent=1 if filters.hide_sent else 0, source=filters.source, content=filters.content, answer_state=filters.answer_state, page_size=filters.page_size or page_size) }}">Следующая →</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+const replySelectionKey = 'reply-panel-selected-ids';
+const activeTenantId = {{ active_tenant_id|tojson }};
+function rowCheckboxes() { return Array.from(document.querySelectorAll('.row-checkbox')); }
+function getSelectedSet() { try { const data = JSON.parse(localStorage.getItem(replySelectionKey) || '[]'); return new Set(Array.isArray(data) ? data : []);} catch(e){ return new Set(); } }
+function saveSelectedSet() { const ids = rowCheckboxes().filter(cb => cb.checked).map(cb => cb.value); localStorage.setItem(replySelectionKey, JSON.stringify(ids)); }
+function restoreSelectedSet() { const selected = getSelectedSet(); rowCheckboxes().forEach(cb => { cb.checked = selected.has(cb.value); }); syncMaster(); }
+function syncMaster() { const boxes = rowCheckboxes(); const checked = boxes.filter(x => x.checked).length; const master = document.getElementById('master-checkbox'); if (!master) return; master.checked = boxes.length > 0 && checked === boxes.length; master.indeterminate = checked > 0 && checked < boxes.length; }
+function setAllVisible(state) { rowCheckboxes().forEach(cb => cb.checked = state); saveSelectedSet(); syncMaster(); }
+function invertVisible() { rowCheckboxes().forEach(cb => cb.checked = !cb.checked); saveSelectedSet(); syncMaster(); }
+function toggleMaster(master) { setAllVisible(master.checked); }
+function getSelectedIds() { return rowCheckboxes().filter(cb => cb.checked).map(cb => cb.value); }
+function chunkIds(ids, size) { const chunks=[]; for(let i=0;i<ids.length;i+=size) chunks.push(ids.slice(i,i+size)); return chunks; }
+function getReplyTextById(id) { const textarea=document.querySelector('textarea[name="reply__'+id+'"]'); return textarea ? textarea.value : ''; }
+function setBulkStatus(message, kind='info'){ const el=document.getElementById('bulk-status'); if(!el) return; el.textContent=message||''; el.style.color = kind==='error' ? '#991b1b' : kind==='success' ? '#065f46' : '#374151'; }
+function setBulkBusy(isBusy){ ['btn-prepare-selected','btn-queue-selected'].forEach(id=>{ const btn=document.getElementById(id); if(btn) btn.disabled=!!isBusy; }); }
+function formatEta(seconds){ if(!seconds || seconds<1) return 'меньше минуты'; const mins=Math.floor(seconds/60); const secs=Math.floor(seconds%60); if(mins<=0) return secs+' сек'; return mins+' мин '+secs+' сек'; }
+async function postJson(url, payload) { const response = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); let data={}; try{ data=await response.json(); }catch(e){} if(!response.ok){ throw new Error(data.message || ('HTTP '+response.status)); } return data; }
+async function prepareSelectedReplies(){ const ids=getSelectedIds(); if(!ids.length){ setBulkStatus('Выберите хотя бы один отзыв.','error'); return; } setBulkBusy(true); const tenantPart=activeTenantId ? ('?tenant_id='+encodeURIComponent(activeTenantId)) : ''; const chunks=chunkIds(ids, 25); let generated=0; let errors=[]; const started=Date.now(); try{ for(let i=0;i<chunks.length;i++){ const elapsed=(Date.now()-started)/1000; const done=Math.max(i,1); const eta=(elapsed/done)*(chunks.length-i); setBulkStatus('Подготовка AI-черновиков: '+(i+1)+' / '+chunks.length+' · ETA: '+formatEta(eta),'info'); const data=await postJson('/replies/prepare_json'+tenantPart,{ selected_ids: chunks[i], force:false }); generated += data.generated||0; errors = errors.concat(data.errors||[]); saveSelectedSet(); } setBulkStatus('AI-черновики обновлены: '+generated+(errors.length ? '. Ошибок: '+errors.length : ''), errors.length ? 'error' : 'success'); setTimeout(()=>window.location.reload(), 900); } catch(e){ setBulkStatus('Не удалось подготовить черновики: '+e.message,'error'); } finally { setBulkBusy(false); } }
+async function saveSelectedReplyDrafts(ids){ const tenantPart=activeTenantId ? ('?tenant_id='+encodeURIComponent(activeTenantId)) : ''; const chunks=[]; let current=[]; let currentChars=0; ids.forEach(id=>{ const text=getReplyTextById(id)||''; const payload={ review_id:id, reply_text:text }; const chars=text.length; if(current.length && (current.length>=20 || currentChars+chars>120000)){ chunks.push(current); current=[]; currentChars=0; } current.push(payload); currentChars+=chars; }); if(current.length) chunks.push(current); let saved=0, notes=[]; const started=Date.now(); for(let i=0;i<chunks.length;i++){ const elapsed=(Date.now()-started)/1000; const done=Math.max(i,1); const eta=(elapsed/done)*(chunks.length-i); setBulkStatus('Сохранение черновиков: '+(i+1)+' / '+chunks.length+' · ETA: '+formatEta(eta),'info'); const data=await postJson('/replies/save_drafts_json'+tenantPart,{ items: chunks[i]}); saved += data.saved||0; notes=notes.concat(data.notes||[]); } return {saved, notes}; }
+async function queueSelectedReplyIds(ids){ const tenantPart=activeTenantId ? ('?tenant_id='+encodeURIComponent(activeTenantId)) : ''; const chunks=chunkIds(ids, 250); let added=0, notes=[]; const started=Date.now(); for(let i=0;i<chunks.length;i++){ const elapsed=(Date.now()-started)/1000; const done=Math.max(i,1); const eta=(elapsed/done)*(chunks.length-i); setBulkStatus('Добавление в очередь: '+(i+1)+' / '+chunks.length+' · ETA: '+formatEta(eta),'info'); const data=await postJson('/replies/queue_ids_json'+tenantPart,{ selected_ids: chunks[i]}); added += data.added||0; notes=notes.concat(data.notes||[]); } return {added, notes}; }
+async function queueSelectedReplies(){ const ids=getSelectedIds(); if(!ids.length){ setBulkStatus('Выберите хотя бы один отзыв.','error'); return; } setBulkBusy(true); try{ const saveResult=await saveSelectedReplyDrafts(ids); const queueResult=await queueSelectedReplyIds(ids); const notes=[].concat(saveResult.notes||[], queueResult.notes||[]); setBulkStatus('В очередь ответов добавлено: '+queueResult.added+(notes.length ? '. Примечаний: '+notes.length : ''), queueResult.added ? 'success' : 'error'); saveSelectedSet(); setTimeout(()=>window.location.reload(),900); } catch(e){ setBulkStatus('Не удалось добавить ответы в очередь: '+e.message,'error'); } finally { setBulkBusy(false); } }
+async function pollHistorySyncStatus(){ const tenantPart=activeTenantId ? ('?tenant_id='+encodeURIComponent(activeTenantId)) : ''; try{ const data = await fetch('/replies/history-sync/status'+tenantPart).then(r=>r.json()); const meta=data.meta||{}; const statusEl=document.getElementById('history-sync-status'); const extraEl=document.getElementById('history-sync-extra'); if(statusEl){ const active=(meta.active_imported||meta.db_active_rows||0)+'/'+(meta.expected_active_unanswered||0); const archive=(meta.archive_imported||meta.db_archive_rows||0)+'/'+(meta.expected_archive_total||0); statusEl.textContent='Статус: '+(meta.status||'—')+' · Фаза: '+(meta.phase||'—')+' · Active '+active+' · Archive '+archive+' · Прогресс: '+(meta.progress_percent||0)+'%'; } if(extraEl){ let extra='Последний heartbeat: '+(meta.last_heartbeat_at||'—'); if(meta.last_progress_at){ extra += ' · Последний прогресс: '+meta.last_progress_at; } if(meta.eta_seconds){ extra += ' · ETA: '+formatEta(meta.eta_seconds); } if(meta.last_batch_count){ extra += ' · Последний батч: '+meta.last_batch_count; } if(meta.last_status_message){ extra += ' · '+meta.last_status_message; } if(meta.retry_attempt){ extra += ' · Retry: '+meta.retry_attempt; } if(meta.is_stale){ extra += ' · Возможна пауза/зависание'; } extraEl.textContent = extra; } if(meta.status==='running' || meta.status==='starting'){ setTimeout(pollHistorySyncStatus, 5000); } }catch(e){ console.log(e); } }
+document.addEventListener('change', function(e){ if(e.target.classList.contains('row-checkbox')){ saveSelectedSet(); syncMaster(); }});
+document.addEventListener('DOMContentLoaded', function(){ restoreSelectedSet(); if(activeTenantId){ pollHistorySyncStatus(); document.querySelectorAll('form').forEach(function(form){ if(form.querySelector('input[name="tenant_id"]')) return; const input=document.createElement('input'); input.type='hidden'; input.name='tenant_id'; input.value=activeTenantId; form.appendChild(input); }); document.querySelectorAll('a[href]').forEach(function(a){ const href=a.getAttribute('href'); if(!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return; if(href.includes('tenant_id=')) return; try{ const url=new URL(href, window.location.origin); if(url.origin!==window.location.origin) return; url.searchParams.set('tenant_id', activeTenantId); a.setAttribute('href', url.pathname + url.search + url.hash); }catch(e){} }); }});
+</script>
+</body>
+</html>

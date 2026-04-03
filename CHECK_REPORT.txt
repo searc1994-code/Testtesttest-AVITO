@@ -1,0 +1,7 @@
+price_uploader.py
+- check: python -m py_compile /mnt/data/final_3min_browser_stage/price_uploader.py
+- result: OK
+
+Notes:
+- Modified only _default_browser_handler in the provided file.
+- No full-project import/template/smoke checks were run because only a standalone file was provided as the requested base.
