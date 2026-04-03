@@ -8,6 +8,7 @@ import subprocess
 import sys
 import re
 import time
+import traceback
 import zipfile
 from urllib.parse import urlparse
 from collections import Counter, defaultdict
@@ -111,9 +112,12 @@ from question_core import (
     upsert_question_rule,
 )
 
+_avito_module_import_traceback = ""
 try:
     from avito_module.blueprint import register_avito_module
 except Exception:
+    _avito_module_import_traceback = traceback.format_exc()
+
     def register_avito_module(app: Flask, **kwargs):
         return app
 
@@ -131,10 +135,13 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=int(getattr(config, "PERMANENT_SESSION_LIFETIME_HOURS", 12))),
 )
 
+if _avito_module_import_traceback:
+    app.logger.error("Avito module import failed; module disabled until files are fixed.\n%s", _avito_module_import_traceback)
+
 try:
     register_avito_module(app)
 except Exception:
-    pass
+    app.logger.exception("Avito module registration failed; module disabled until files are fixed.")
 
 
 def _auth_enabled() -> bool:
