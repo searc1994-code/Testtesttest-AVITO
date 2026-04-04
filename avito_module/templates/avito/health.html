@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Здоровье Avito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1440px; margin:0 auto; padding:20px; }
+    .bar,.panel,.card,.alert,.component { background:#fff; border-radius:16px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar,.panel { padding:16px; }
+    .bar { margin-bottom:16px; }
+    .cards,.components { display:grid; gap:12px; }
+    .cards { grid-template-columns:repeat(4,minmax(180px,1fr)); margin-bottom:16px; }
+    .components { grid-template-columns:repeat(2,minmax(280px,1fr)); }
+    .card,.alert,.component { padding:14px 16px; }
+    .label { color:#64748b; font-size:13px; margin-bottom:4px; }
+    .value { font-size:18px; font-weight:700; }
+    .muted { color:#64748b; font-size:13px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .stack { display:grid; gap:12px; }
+    .grid { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#e2e8f0; font-size:12px; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warning { background:#fef3c7; color:#92400e; }
+    .pill.error { background:#fee2e2; color:#991b1b; }
+    .pill.info { background:#dbeafe; color:#1d4ed8; }
+    .alert.open { border-left:4px solid #dc2626; }
+    .alert.acknowledged { border-left:4px solid #d97706; }
+    .alert.resolved { border-left:4px solid #16a34a; }
+    .btn, button { border:0; background:#2563eb; color:#fff; padding:9px 13px; border-radius:10px; cursor:pointer; font:inherit; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .btn.ghost, button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
+    .btn.warn, button.warn { background:#d97706; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+    code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
+    a { color:#4338ca; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    @media (max-width:1100px) { .cards,.components { grid-template-columns:repeat(2,minmax(180px,1fr)); } .grid { grid-template-columns:1fr; } }
+    @media (max-width:700px) { .cards,.components { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-size:26px;font-weight:700;">Здоровье и алерты Avito</div>
+        <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+        <div class="muted">Общий статус: <span class="pill {{ health_dashboard.overall_status }}">{{ avito_option_label('health_component_status', health_dashboard.overall_status) }}</span></div>
+      </div>
+      <div class="row">
+        <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
+        <a href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id) }}">Операторская очередь</a>
+        <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+        <a href="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}">Очередь ошибок</a>
+        <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+      </div>
+    </div>
+    <div class="muted">Пороговые правила задаются в настройках Avito. Эта страница показывает текущее состояние каналов, очередей и накопленные сигналы.</div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Активных алертов</div><div class="value">{{ health_dashboard.alerts|length }}</div></div>
+    <div class="card"><div class="label">Критичных / предупреждений</div><div class="value">{{ health_dashboard.alert_counts.error }} / {{ health_dashboard.alert_counts.warning }}</div></div>
+    <div class="card"><div class="label">Подтверждённых вручную</div><div class="value">{{ health_dashboard.alert_counts.acknowledged }}</div></div>
+    <div class="card"><div class="label">DLQ / ошибки отправки</div><div class="value">{{ health_dashboard.metrics.dlq_open_count }} / {{ health_dashboard.metrics.send_errors_24h }}</div></div>
+    <div class="card"><div class="label">Webhook за 24ч / отклонения</div><div class="value">{{ health_dashboard.metrics.webhook_events_24h }} / {{ health_dashboard.metrics.webhook_verify_fail_pct_24h }}%</div></div>
+    <div class="card"><div class="label">Poll lag / fallback браузера</div><div class="value">{{ health_dashboard.metrics.poll_lag_seconds if health_dashboard.metrics.poll_lag_seconds is not none else '—' }} сек / {{ health_dashboard.metrics.browser_fallback_share }}%</div></div>
+    <div class="card"><div class="label">Refresh токена / circuit breaker</div><div class="value">{{ health_dashboard.metrics.token_refresh_events_60m }} / {{ health_dashboard.metrics.circuit_open_events_60m }}</div></div>
+    <div class="card"><div class="label">KB hit rate / активных KB</div><div class="value">{{ health_dashboard.metrics.knowledge_hit_rate }}% / {{ health_dashboard.metrics.knowledge_docs_active }}</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="stack">
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Активные сигналы</div>
+        {% if health_dashboard.alerts %}
+          <div class="stack">
+            {% for alert in health_dashboard.alerts %}
+              <div class="alert {{ alert.status }}">
+                <div class="row" style="justify-content:space-between;align-items:flex-start;">
+                  <div>
+                    <div class="row">
+                      <strong>{{ alert.title }}</strong>
+                      <span class="pill {{ alert.level }}">{{ avito_option_label('health_component_status', alert.level) }}</span>
+                      <span class="pill {{ 'warning' if alert.status == 'acknowledged' else 'info' if alert.status == 'resolved' else 'error' }}">{{ avito_option_label('health_alert_status', alert.status) }}</span>
+                    </div>
+                    <div class="muted" style="margin-top:6px;">{{ alert.message }}</div>
+                    <div class="muted" style="margin-top:6px;">Код: <code>{{ alert.code }}</code> · Первое появление: {{ alert.first_seen_at or '—' }} · Последнее обновление: {{ alert.last_seen_at or '—' }}</div>
+                    {% if alert.get('acknowledged_by') %}<div class="muted">Подтвердил: {{ alert.get('acknowledged_by') }} {{ '(' ~ alert.get('acknowledged_at') ~ ')' if alert.get('acknowledged_at') else '' }}</div>{% endif %}
+                    {% if alert.details %}
+                      <div class="muted" style="margin-top:6px;">Контекст:
+                        {% for key, value in alert.details.items() %}
+                          <code>{{ key }}={{ value }}</code>{% if not loop.last %} {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                  {% if avito_permissions.admin and alert.status == 'open' %}
+                    <form method="post" action="{{ url_for('avito_module.avito_health_ack', tenant_id=active_tenant_id, alert_id=alert.alert_id) }}">
+                      <button type="submit" class="ghost">Подтвердить</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">Сейчас активных сигналов нет. Контур выглядит стабильно.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Компоненты здоровья</div>
+        <div class="components">
+          {% for key in health_dashboard.component_order %}
+            {% set comp = health_dashboard.components.get(key) %}
+            {% if comp %}
+              <div class="component">
+                <div class="row" style="justify-content:space-between;align-items:center;">
+                  <strong>{{ comp.title }}</strong>
+                  <span class="pill {{ comp.status }}">{{ avito_option_label('health_component_status', comp.status) }}</span>
+                </div>
+                <div class="muted" style="margin-top:8px;">{{ comp.summary }}</div>
+                {% if comp.details %}
+                  <div class="muted" style="margin-top:8px;">
+                    {% for key, value in comp.details.items() %}
+                      <div><code>{{ key }}</code>: {{ value if value is not none and value != '' else '—' }}</div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Последние контрольные точки</div>
+        <div class="stack">
+          <div class="muted">Последний webhook: {{ health_dashboard.latest_webhook_at or '—' }}</div>
+          <div class="muted">Возраст последнего webhook: {{ health_dashboard.webhook_age_seconds if health_dashboard.webhook_age_seconds is not none else '—' }} сек</div>
+          <div class="muted">Последний poll-sync: {{ health_dashboard.last_sync_at or '—' }}</div>
+          <div class="muted">Последняя историческая дозагрузка: {{ health_dashboard.last_backfill_at or '—' }}</div>
+          <div class="muted">Последний webhook event id: {{ health_dashboard.latest_webhook.event_id if health_dashboard.latest_webhook else '—' }}</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Пороговые правила</div>
+        <div class="stack">
+          {% for key, value in health_dashboard.rules.items() %}
+            <div class="muted"><code>{{ key }}</code>: {{ value }}</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Последние алерты</div>
+        <div class="muted" style="margin-bottom:10px;">Открытых: {{ health_dashboard.alert_history_open_count }} · подтверждённых: {{ health_dashboard.alert_history_ack_count }} · закрытых: {{ health_dashboard.alert_history_resolved_count }}</div>
+        <table>
+          <thead>
+            <tr><th>Когда</th><th>Код</th><th>Статус</th><th>Описание</th></tr>
+          </thead>
+          <tbody>
+            {% for item in health_dashboard.alert_history[:12] %}
+              <tr>
+                <td class="muted">{{ item.last_seen_at or item.first_seen_at or '—' }}</td>
+                <td><code>{{ item.code }}</code></td>
+                <td><span class="pill {{ 'warning' if item.status == 'acknowledged' else 'info' if item.status == 'resolved' else item.severity }}">{{ avito_option_label('health_alert_status', item.status) }}</span></td>
+                <td>{{ item.title }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="muted">История сигналов пока пуста.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

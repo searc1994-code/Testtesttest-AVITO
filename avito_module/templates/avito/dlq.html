@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Avito DLQ</title>
+  <title>Очередь ошибок Avito</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
@@ -20,15 +20,17 @@
   </style>
 </head>
 <body>
+{% set dlq_status_labels = {"open":"открыт", "resolved":"разобран", "discarded":"отброшен", "all":"все"} %}
 <div class="wrap">
   <div class="bar">
     <div>
-      <div style="font-size:22px;font-weight:700;">Dead-letter queue Avito</div>
+      <div style="font-size:22px;font-weight:700;">Очередь ошибок Avito</div>
       <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
     </div>
     <div>
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
       <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
@@ -37,7 +39,7 @@
       <label>Статус
         <select name="status">
           {% for value in ['open', 'resolved', 'discarded', 'all'] %}
-            <option value="{{ value }}" {% if dlq_status == value %}selected{% endif %}>{{ value }}</option>
+            <option value="{{ value }}" {% if dlq_status == value %}selected{% endif %}>{{ dlq_status_labels.get(value, value) }}</option>
           {% endfor %}
         </select>
       </label>
@@ -48,18 +50,18 @@
   <div class="panel">
     {% if dlq_items %}
       <table>
-        <thead><tr><th>ID</th><th>Source</th><th>Error</th><th>Payload</th><th>Replay</th></tr></thead>
+        <thead><tr><th>ID</th><th>Источник</th><th>Ошибка</th><th>Полезная нагрузка</th><th>Повтор</th></tr></thead>
         <tbody>
         {% for item in dlq_items %}
           <tr>
-            <td>#{{ item.dlq_id }}<div class="muted">{{ item.status }}</div><div class="muted">attempts={{ item.attempts }}</div></td>
-            <td>{{ item.source_kind }}<div class="muted">event={{ item.event_id or '—' }}</div></td>
-            <td>{{ item.error_text or '—' }}<div class="muted">{{ item.updated_at }}</div></td>
+            <td>#{{ item.dlq_id }}<div class="muted">{{ dlq_status_labels.get(item.status, item.status) }}</div><div class="muted">Попыток: {{ item.attempts }}</div></td>
+            <td>{{ item.source_kind }}<div class="muted">Событие: {{ item.event_id or '—' }}</div></td>
+            <td>{{ item.error_text or '—' }}<div class="muted">Обновлено: {{ item.updated_at or '—' }}</div></td>
             <td><pre>{{ item.payload | tojson(indent=2) }}</pre></td>
             <td>
               {% if avito_permissions.admin %}
               <form method="post" action="{{ url_for('avito_module.avito_replay_dlq', tenant_id=active_tenant_id, dlq_id=item.dlq_id) }}">
-                <button type="submit">Replay</button>
+                <button type="submit">Переиграть</button>
               </form>
               {% else %}
               <div class="muted">Нет прав</div>
@@ -70,7 +72,7 @@
         </tbody>
       </table>
     {% else %}
-      <div class="muted">DLQ пуст.</div>
+      <div class="muted">Очередь ошибок пуста.</div>
     {% endif %}
   </div>
 </div>

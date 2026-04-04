@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import mimetypes
 import os
 import time
+from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
 from dataclasses import dataclass
 from pathlib import Path
@@ -187,6 +189,69 @@ class AvitoBrowserMonitor:
         return {"ok": True, "state_path": str(state_path), "saved_at": saved_at, "notes": notes}
 
 
+    def _external_fetch_allowed(self, external_url: str) -> Tuple[bool, str]:
+        if not self.config.media_allow_external_fetch:
+            return False, "external_fetch_disabled"
+        parsed = urlparse(clean_text(external_url))
+        scheme = clean_text(parsed.scheme).lower()
+        host = clean_text(parsed.hostname).lower()
+        if scheme not in {"http", "https"}:
+            return False, "unsupported_scheme"
+        if not host:
+            return False, "missing_host"
+        if host in {"localhost", "127.0.0.1", "::1"} or host.endswith('.local'):
+            return False, "local_address_blocked"
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False, "private_ip_blocked"
+        except ValueError:
+            pass
+        allowlist = [clean_text(item).lower() for item in (self.config.media_allowed_external_hosts or []) if clean_text(item)]
+        if allowlist and not any(host == domain or host.endswith('.' + domain) for domain in allowlist):
+            return False, "domain_not_allowlisted"
+        return True, "ok"
+
+    def _download_external_asset(self, external_url: str, asset: Dict[str, Any]) -> Tuple[str, str]:
+        allowed, reason = self._external_fetch_allowed(external_url)
+        if not allowed:
+            raise RuntimeError(reason)
+        try:
+            import requests
+        except Exception as exc:
+            raise RuntimeError(f"requests_unavailable:{exc}") from exc
+        response = requests.get(external_url, timeout=(5, 20), allow_redirects=False, stream=True)
+        response.raise_for_status()
+        content_length = int(response.headers.get('Content-Length') or 0)
+        max_bytes = max(1, int(self.config.media_download_max_bytes or 8 * 1024 * 1024))
+        if content_length and content_length > max_bytes:
+            raise RuntimeError(f"content_length_exceeds_limit:{content_length}>{max_bytes}")
+        content_type = clean_text((response.headers.get('Content-Type') or '').split(';')[0]).lower()
+        allowed_mime_types = {clean_text(item).lower() for item in (self.config.media_allowed_mime_types or []) if clean_text(item)}
+        if allowed_mime_types and content_type and content_type not in allowed_mime_types:
+            raise RuntimeError(f"mime_not_allowed:{content_type}")
+        ext = Path(external_url.split('?')[0]).suffix
+        if not ext:
+            ext = mimetypes.guess_extension(clean_text(asset.get('mime_type')) or content_type or '') or '.bin'
+        tmp_dir = self.storage.paths.media_dir / '_send_tmp'
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        total = 0
+        with NamedTemporaryFile(delete=False, suffix=ext, dir=str(tmp_dir)) as fh:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > max_bytes:
+                    fh.close()
+                    try:
+                        Path(fh.name).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise RuntimeError(f"download_exceeds_limit:{total}>{max_bytes}")
+                fh.write(chunk)
+            temp_name = fh.name
+        return temp_name, content_type or clean_text(asset.get('mime_type'))
+
     def _prepare_local_media_files(self, assets: List[Dict[str, Any]]) -> Tuple[List[str], List[str], List[Dict[str, Any]]]:
         prepared: List[str] = []
         temp_files: List[str] = []
@@ -206,17 +271,12 @@ class AvitoBrowserMonitor:
                 skipped.append({"asset_id": asset.get("asset_id"), "reason": "no_local_or_external_path", "media_kind": media_kind})
                 continue
             try:
-                import requests
-                response = requests.get(external_url, timeout=30)
-                response.raise_for_status()
-                ext = Path(external_url.split("?")[0]).suffix
-                if not ext:
-                    ext = mimetypes.guess_extension(clean_text(asset.get("mime_type")) or "") or ".bin"
-                tmp_dir = self.storage.paths.media_dir / "_send_tmp"
-                tmp_dir.mkdir(parents=True, exist_ok=True)
-                with NamedTemporaryFile(delete=False, suffix=ext, dir=str(tmp_dir)) as fh:
-                    fh.write(response.content)
-                    temp_name = fh.name
+                temp_name, detected_mime = self._download_external_asset(external_url, asset)
+                if self.config.media_allowed_mime_types:
+                    allowed = {clean_text(item).lower() for item in (self.config.media_allowed_mime_types or []) if clean_text(item)}
+                    if detected_mime and allowed and clean_text(detected_mime).lower() not in allowed:
+                        Path(temp_name).unlink(missing_ok=True)
+                        raise RuntimeError(f"mime_not_allowed:{detected_mime}")
                 temp_files.append(temp_name)
                 prepared.append(temp_name)
             except Exception as exc:

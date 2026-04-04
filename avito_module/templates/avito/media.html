@@ -16,10 +16,14 @@
     button.err { background:#b91c1c; }
     button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
     .muted { color:#64748b; font-size:13px; }
+    .hint { color:#64748b; font-size:12px; line-height:1.45; }
     .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
     .asset { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .field { display:grid; gap:6px; }
+    .field-label { font-weight:600; }
     img.preview, video.preview { max-width:180px; max-height:180px; border-radius:10px; border:1px solid #e2e8f0; }
+    code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
   </style>
 </head>
 <body>
@@ -31,9 +35,10 @@
       <div class="muted">Материалов: {{ avito_metrics.media_assets_total }} · активных: {{ avito_metrics.media_assets_active }}</div>
     </div>
     <div class="row">
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
       <a href="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}">База знаний</a>
       <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
@@ -47,62 +52,66 @@
 
   <div class="grid">
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Добавить / обновить материал</div>
+      <div style="font-weight:700;margin-bottom:12px;">Добавить или обновить материал</div>
+      <div class="hint" style="margin-bottom:12px;">Здесь хранятся фото, видео и документы, которые модуль может предложить менеджеру или приложить к ответу. По умолчанию внешние ссылки только сохраняются, а серверная загрузка из интернета отключена, если её явно не разрешить в настройках.</div>
       {% if avito_permissions.connect %}
       <form method="post" enctype="multipart/form-data" action="{{ url_for('avito_module.avito_media_upsert', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
         <input type="hidden" name="asset_id" value="">
-        <label>Название
+        <label class="field"><span class="field-label">Название</span>
           <input type="text" name="title" placeholder="Например: Фото бокового ракурса">
+          <span class="hint">Понятное имя материала для менеджера и для автоподсказок.</span>
         </label>
-        <label>Тип
+        <label class="field"><span class="field-label">Тип материала</span>
           <select name="media_kind">
             {% for value in ['image', 'video', 'document', 'other'] %}
-              <option value="{{ value }}">{{ value }}</option>
+              <option value="{{ value }}">{{ avito_option_label('media_kind', value) }}</option>
             {% endfor %}
           </select>
+          <span class="hint">Выбери тип файла: изображение, видео, документ или другой материал.</span>
         </label>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Item ID
-            <input type="text" name="item_id">
-          </label>
-          <label style="flex:2;min-width:220px;">Item title
-            <input type="text" name="item_title">
-          </label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">ID товара</span><input type="text" name="item_id"><span class="hint">Необязательная привязка к конкретному товару или объявлению.</span></label>
+          <label class="field" style="flex:2;min-width:220px;"><span class="field-label">Название товара</span><input type="text" name="item_title"><span class="hint">Название товара, к которому относится этот материал.</span></label>
         </div>
-        <label>Описание / подпись
+        <label class="field"><span class="field-label">Описание / подпись</span>
           <textarea rows="5" name="caption"></textarea>
+          <span class="hint">Короткое описание того, что на фото или в видео: ракурс, дефект, размер, комплектация.</span>
         </label>
-        <label>Загрузить файл
+        <label class="field"><span class="field-label">Загрузить файл</span>
           <input type="file" name="media_file" accept="image/*,video/*,application/pdf">
+          <span class="hint">Загружай локальный файл, если хочешь хранить его прямо в tenant-хранилище модуля.</span>
         </label>
-        <label>Или внешний URL
+        <label class="field"><span class="field-label">Или внешний URL</span>
           <input type="text" name="external_url" placeholder="https://...">
+          <span class="hint">Ссылка на внешний материал. Она должна быть публичной и безопасной. Локальные и приватные адреса запрещены.</span>
         </label>
-        <label>MIME type (опционально)
+        <label class="field"><span class="field-label">MIME-тип (необязательно)</span>
           <input type="text" name="mime_type" placeholder="image/jpeg">
+          <span class="hint">Можно оставить пустым: браузер и сервер попытаются определить тип сами.</span>
         </label>
-        <label>Теги
-          <input type="text" name="tags" placeholder="фото, ракурс, stroller">
+        <label class="field"><span class="field-label">Теги</span>
+          <input type="text" name="tags" placeholder="фото, ракурс, коляска">
+          <span class="hint">Ключевые слова для поиска и автоподбора. Вводи через запятую.</span>
         </label>
-        <label>Внутренние заметки
+        <label class="field"><span class="field-label">Внутренние заметки</span>
           <input type="text" name="meta_notes">
+          <span class="hint">Техническая пометка для команды: например, для какого сценария использовать материал.</span>
         </label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="active" checked> активный материал</label>
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="active" checked> Использовать этот материал в подсказках и отправке</label>
         <button type="submit">Сохранить материал</button>
       </form>
-      <div class="muted" style="margin-top:12px;">По умолчанию модуль пока только подбирает и показывает материалы. Боевая API-отправка вложений остаётся выключенной, пока не подтверждена на реальном Avito-аккаунте.</div>
       {% else %}
         <div class="muted">Нет прав на управление медиа-материалами.</div>
       {% endif %}
     </div>
 
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Материалы</div>
+      <div style="font-weight:700;margin-bottom:12px;">Список материалов</div>
       <form method="get" action="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}" class="row" style="margin-bottom:12px;">
-        <input type="text" name="q" value="{{ media_search }}" placeholder="Поиск по title/caption/item/tags" style="flex:2;min-width:260px;">
+        <input type="text" name="q" value="{{ media_search }}" placeholder="Поиск по названию, подписи, товару и тегам" style="flex:2;min-width:260px;">
         <select name="kind" style="flex:1;min-width:160px;">
           {% for value in media_kinds %}
-            <option value="{{ value }}" {% if media_kind == value %}selected{% endif %}>{{ value }}</option>
+            <option value="{{ value }}" {% if media_kind == value %}selected{% endif %}>{{ 'Все типы' if value == 'all' else avito_option_label('media_kind', value) }}</option>
           {% endfor %}
         </select>
         <button type="submit" class="ghost">Найти</button>
@@ -112,8 +121,9 @@
           <div class="row" style="justify-content:space-between;align-items:flex-start;">
             <div>
               <div style="font-weight:700;">{{ asset.title }}</div>
-              <div class="muted">kind={{ asset.media_kind }} · item={{ asset.item_title or asset.item_id or '—' }} · active={{ 'yes' if asset.active else 'no' }}</div>
-              {% if asset.tags %}<div class="muted">tags={{ asset.tags | join(', ') }}</div>{% endif %}
+              <div class="muted">Тип: {{ avito_option_label('media_kind', asset.media_kind) }} · Товар: {{ asset.item_title or asset.item_id or 'не указан' }} · Активность: {{ 'включён' if asset.active else 'выключен' }}</div>
+              {% if asset.tags %}<div class="muted">Теги: {{ asset.tags | join(', ') }}</div>{% endif %}
+              {% if asset.mime_type %}<div class="muted">MIME-тип: {{ asset.mime_type }}</div>{% endif %}
             </div>
             {% if avito_permissions.connect %}
             <form method="post" action="{{ url_for('avito_module.avito_media_delete', tenant_id=active_tenant_id, asset_id=asset.asset_id) }}" onsubmit="return confirm('Удалить материал?');">
@@ -127,6 +137,7 @@
             {% elif asset.media_kind == 'video' %}
               <div style="margin-top:10px;"><video class="preview" controls src="{{ asset.external_url }}"></video></div>
             {% endif %}
+            <div class="muted" style="margin-top:8px;">Внешний URL: <code>{{ asset.external_url }}</code></div>
           {% elif asset.local_path %}
             {% if asset.media_kind == 'image' %}
               <div style="margin-top:10px;"><img class="preview" src="{{ url_for('avito_module.avito_media_file', tenant_id=active_tenant_id, asset_id=asset.asset_id) }}" alt="{{ asset.title }}"></div>
@@ -137,7 +148,7 @@
             {% endif %}
           {% endif %}
           {% if asset.caption %}<div style="margin-top:10px;white-space:pre-wrap;">{{ asset.caption }}</div>{% endif %}
-          <div class="muted" style="margin-top:8px;">updated={{ asset.updated_at }}</div>
+          <div class="muted" style="margin-top:8px;">Обновлён: {{ asset.updated_at }}</div>
         </div>
       {% else %}
         <div class="muted">Материалов пока нет.</div>

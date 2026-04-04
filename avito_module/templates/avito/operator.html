@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Операторская очередь Avito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
+    .wrap { max-width:1460px; margin:0 auto; padding:20px; }
+    .bar,.panel,.card,.chat { background:#fff; border-radius:16px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
+    .bar,.panel,.chat,.card { padding:16px; }
+    .bar { margin-bottom:16px; }
+    .cards { display:grid; grid-template-columns:repeat(5,minmax(160px,1fr)); gap:12px; margin-top:14px; }
+    .card .label { color:#64748b; font-size:13px; margin-bottom:6px; }
+    .card .value { font-size:20px; font-weight:700; }
+    .grid { display:grid; grid-template-columns:360px 1fr; gap:16px; }
+    .stack { display:grid; gap:12px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    input, select, textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
+    textarea { min-height:90px; }
+    button, .btn { border:0; background:#2563eb; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font:inherit; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .btn.secondary, button.secondary { background:#475569; }
+    .btn.ghost, button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#e2e8f0; font-size:12px; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; }
+    .muted { color:#64748b; font-size:13px; }
+    .hint { color:#64748b; font-size:12px; line-height:1.45; }
+    a { color:#4338ca; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    @media (max-width: 1100px) { .cards { grid-template-columns:repeat(2,minmax(160px,1fr)); } .grid { grid-template-columns:1fr; } }
+    @media (max-width: 700px) { .cards { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar stack">
+    <div class="row" style="justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div style="font-size:26px; font-weight:700;">Операторская очередь Avito</div>
+        <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
+        <div class="muted">Текущий оператор: {{ avito_current_user or 'не определён' }}</div>
+      </div>
+      <div class="row">
+        <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
+        <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">Очередь проверки</a>
+        <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+        <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
+      </div>
+    </div>
+
+    <div class="cards">
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='mine') }}"><div class="label">Моя очередь</div><div class="value">{{ operator_dashboard.counts.mine }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='unassigned') }}"><div class="label">Неназначенные</div><div class="value">{{ operator_dashboard.counts.unassigned }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='overdue') }}"><div class="label">Просрочено по SLA</div><div class="value">{{ operator_dashboard.counts.overdue }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='human') }}"><div class="label">Нужен человек</div><div class="value">{{ operator_dashboard.counts.human }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='escalation') }}"><div class="label">Эскалация</div><div class="value">{{ operator_dashboard.counts.escalation }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='waiting') }}"><div class="label">Ждут клиента</div><div class="value">{{ operator_dashboard.counts.waiting }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='with_media') }}"><div class="label">С медиа</div><div class="value">{{ operator_dashboard.counts.with_media }}</div></a>
+      <a class="card" href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id, bucket='bargain') }}"><div class="label">С торгом</div><div class="value">{{ operator_dashboard.counts.bargain }}</div></a>
+      <div class="card"><div class="label">Закрытые</div><div class="value">{{ operator_dashboard.counts.closed }}</div></div>
+      <div class="card"><div class="label">Всего диалогов</div><div class="value">{{ operator_dashboard.counts.total }}</div></div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="panel" style="margin-bottom:12px;">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="grid">
+    <div class="stack">
+      <div class="panel">
+        <div style="font-size:20px; font-weight:700; margin-bottom:12px;">Фильтры очереди</div>
+        <form method="get" action="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id) }}" class="stack">
+          <label>
+            <div style="font-weight:600; margin-bottom:6px;">Тип очереди</div>
+            <select name="bucket">
+              {% for value in ['team', 'mine', 'unassigned', 'overdue', 'human', 'escalation', 'waiting', 'with_media', 'bargain'] %}
+                <option value="{{ value }}" {% if operator_bucket == value %}selected{% endif %}>{{ avito_option_label('operator_bucket', value) }}</option>
+              {% endfor %}
+            </select>
+            <div class="hint">{{ avito_field_hint('operator_bucket') }}</div>
+          </label>
+          <label>
+            <div style="font-weight:600; margin-bottom:6px;">Статус чата</div>
+            <select name="status">
+              {% for value in ['all', 'new', 'in_progress', 'waiting_customer', 'closed', 'escalation'] %}
+                <option value="{{ value }}" {% if operator_status_filter == value %}selected{% endif %}>{{ avito_option_label('chat_status', value) }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <div style="font-weight:600; margin-bottom:6px;">Фильтр по оператору</div>
+            <input type="text" name="assigned_to" value="{{ operator_assignee_filter or '' }}" list="operator-assignees" placeholder="Оставь пустым для всех">
+          </label>
+          <label class="row" style="gap:8px;"><input type="checkbox" name="unanswered" value="1" {% if operator_unanswered %}checked{% endif %}> только без ответа</label>
+          <label>
+            <div style="font-weight:600; margin-bottom:6px;">Лимит строк</div>
+            <input type="number" name="limit" min="10" max="500" value="{{ operator_limit }}">
+            <div class="hint">{{ avito_field_hint('operator_limit') }}</div>
+          </label>
+          <button type="submit" class="ghost">Обновить очередь</button>
+        </form>
+        <datalist id="operator-assignees">
+          {% for name in operator_assignees %}<option value="{{ name }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="panel">
+        <div style="font-size:20px; font-weight:700; margin-bottom:12px;">Нагрузка по операторам</div>
+        <div class="stack">
+          {% for item in operator_dashboard.top_assignees %}
+            <div class="row" style="justify-content:space-between;"><strong>{{ item.name }}</strong><span class="pill">{{ item.count }} диалогов</span></div>
+          {% else %}
+            <div class="muted">Пока нет назначенных операторов.</div>
+          {% endfor %}
+          {% if operator_dashboard.truncated %}<div class="hint">Снимок нагрузки построен по первым 1500 чатам. Если объём вырастет, этот блок лучше вынести в SQL-агрегации.</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-size:20px; font-weight:700; margin-bottom:12px;">Подсказка по работе</div>
+        <div class="hint">Операторская очередь нужна для быстрых массовых действий: взять диалоги в работу, назначить на менеджера, перевести в ожидание клиента, закрыть или эскалировать. Для детальной проверки ответа и базы знаний открывай карточку конкретного чата.</div>
+      </div>
+    </div>
+
+    <div class="panel stack">
+      <div style="font-size:20px; font-weight:700;">{{ avito_option_label('operator_bucket', operator_bucket) }}</div>
+      <form method="post" action="{{ url_for('avito_module.avito_operator_action', tenant_id=active_tenant_id) }}" class="stack">
+        <input type="hidden" name="bucket" value="{{ operator_bucket }}">
+        <input type="hidden" name="status" value="{{ operator_status_filter }}">
+        <input type="hidden" name="assigned_to" value="{{ operator_assignee_filter }}">
+        <input type="hidden" name="limit" value="{{ operator_limit }}">
+        {% if operator_unanswered %}<input type="hidden" name="unanswered" value="1">{% endif %}
+
+        <div class="row" style="align-items:flex-end;">
+          <label style="flex:1; min-width:220px;">
+            <div style="font-weight:600; margin-bottom:6px;">Массовое действие</div>
+            <select name="action">
+              {% for value in ['claim_me', 'assign', 'release', 'start', 'waiting', 'escalate', 'close', 'reopen', 'priority_high', 'priority_normal', 'priority_low'] %}
+                <option value="{{ value }}">{{ avito_option_label('operator_action', value) }}</option>
+              {% endfor %}
+            </select>
+            <div class="hint">{{ avito_field_hint('operator_action') }}</div>
+          </label>
+          <label style="flex:1; min-width:220px;">
+            <div style="font-weight:600; margin-bottom:6px;">Назначить на оператора</div>
+            <input type="text" name="assignee" list="operator-assignees" placeholder="Нужно только для действия “назначить оператора”">
+          </label>
+          <label style="flex:1.4; min-width:260px;">
+            <div style="font-weight:600; margin-bottom:6px;">Комментарий к действию</div>
+            <input type="text" name="note" placeholder="Например: разобрать после обеда">
+          </label>
+          <button type="submit">Применить к выбранным</button>
+        </div>
+
+        {% if operator_rows %}
+          {% for chat in operator_rows %}
+            <div class="chat">
+              <div class="row" style="justify-content:space-between; align-items:flex-start;">
+                <div class="row" style="align-items:flex-start; flex:1; min-width:280px;">
+                  <input type="checkbox" name="chat_ids" value="{{ chat.chat_id }}" style="width:auto; margin-top:4px;">
+                  <div>
+                    <div style="font-size:18px; font-weight:700;">{{ chat.client_name or chat.title or chat.chat_id }}</div>
+                    <div class="muted">{{ chat.item_title or 'Объявление не указано' }}</div>
+                    <div class="row" style="margin-top:8px;">
+                      <span class="pill">{{ avito_option_label('chat_status', chat.status or 'new') }}</span>
+                      <span class="pill">Приоритет: {{ avito_option_label('priority', chat.priority or 'normal') }}</span>
+                      {% if chat.sla_state == 'overdue' %}<span class="pill err">SLA просрочен</span>{% elif chat.sla_state == 'due_soon' %}<span class="pill warn">SLA скоро истекает</span>{% elif chat.sla_state == 'answered' %}<span class="pill ok">Первый ответ уже дан</span>{% endif %}
+                      {% if chat.flags.needs_human %}<span class="pill warn">Нужен человек</span>{% endif %}
+                      {% if chat.flags.has_bargain %}<span class="pill warn">Торг</span>{% endif %}
+                      {% if chat.flags.has_media_selected %}<span class="pill ok">Есть медиа</span>{% endif %}
+                      {% if chat.draft_state %}<span class="pill">Черновик: {{ avito_option_label('draft_state', chat.draft_state) }}</span>{% endif %}
+                      {% if chat.decision_level %}<span class="pill">Уровень: {{ avito_option_label('decision_level', chat.decision_level) }}</span>{% endif %}
+                    </div>
+                  </div>
+                </div>
+                <a class="btn ghost" href="{{ url_for('avito_module.avito_chat', tenant_id=active_tenant_id, chat_id=chat.chat_id) }}">Открыть чат</a>
+              </div>
+              <div style="margin-top:10px; white-space:pre-wrap;">{{ chat.last_message_text or 'Сообщение пока не загружено' }}</div>
+              <div class="row" style="justify-content:space-between; margin-top:10px;">
+                <div class="muted">
+                  Ответственный: {{ chat.assigned_to or 'не назначен' }} · Последний оператор: {{ chat.last_operator_user or '—' }}
+                  {% if chat.first_response_due_at %} · SLA до {{ chat.first_response_due_at }}{% endif %}
+                  {% if chat.last_send_status %} · Последняя отправка: {{ chat.last_send_status }}{% endif %}
+                </div>
+                {% if chat.queue_reason %}<div class="hint">Причина ручной работы: {{ chat.queue_reason }}</div>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted">Для выбранных фильтров очередь пуста.</div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>

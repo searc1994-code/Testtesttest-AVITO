@@ -16,9 +16,13 @@
     button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
     button.err { background:#b91c1c; }
     .muted { color:#64748b; font-size:13px; }
+    .hint { color:#64748b; font-size:12px; line-height:1.45; }
     .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
     .doc { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px; }
     .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .field { display:grid; gap:6px; }
+    .field-label { font-weight:600; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; background:#e2e8f0; font-size:12px; }
     code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
   </style>
 </head>
@@ -31,10 +35,12 @@
       <div class="muted">Документов: {{ avito_metrics.knowledge_docs_total }} · активных: {{ avito_metrics.knowledge_docs_active }}</div>
     </div>
     <div class="row">
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
-      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">HITL очередь</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
+      <a href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id) }}">Операторская очередь</a>
+        <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">Очередь проверки</a>
       <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}">Медиа</a>
       <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
@@ -48,51 +54,56 @@
 
   <div class="grid">
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Импорт / обновление базы знаний</div>
+      <div style="font-weight:700;margin-bottom:12px;">Импорт и ручное редактирование</div>
+      <div class="hint" style="margin-bottom:12px;">Здесь можно загрузить документы базы знаний из файла или создать запись вручную. База знаний используется как фактическая опора для генерации ответов.</div>
       {% if avito_permissions.ai_rules %}
       <form method="post" enctype="multipart/form-data" action="{{ url_for('avito_module.avito_knowledge_import', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;margin-bottom:18px;">
-        <label>Файл для импорта
+        <label class="field"><span class="field-label">Файл для импорта</span>
           <input type="file" name="import_file" accept=".txt,.md,.csv,.tsv,.json,.jsonl,.xlsx,text/plain,text/markdown,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <span class="hint">Поддерживаются текстовые и табличные файлы. Используй этот блок, если нужно быстро загрузить FAQ, карточки товаров или правила.</span>
         </label>
         <div class="row">
-          <label style="flex:1;min-width:220px;">Default kind
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Тип по умолчанию</span>
             <select name="default_kind">
               {% for value in ['faq', 'listing_card', 'policy', 'shipping', 'condition', 'size', 'script', 'qa'] %}
-                <option value="{{ value }}">{{ value }}</option>
+                <option value="{{ value }}">{{ avito_option_label('knowledge_kind', value) }}</option>
               {% endfor %}
             </select>
+            <span class="hint">Этот тип будет назначен всем документам, если сам файл его не задаёт.</span>
           </label>
-          <label style="flex:1;min-width:220px;">Source name
-            <input type="text" name="source_name" placeholder="Например: прайс менеджера / xlsx импорт">
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Источник</span>
+            <input type="text" name="source_name" placeholder="Например: импорт из таблицы менеджера">
+            <span class="hint">Короткое описание, откуда взялись эти знания: таблица, документ, выгрузка, заметки менеджера.</span>
           </label>
         </div>
         <button type="submit" class="ghost">Импортировать документы</button>
       </form>
 
-      <div style="font-weight:700;margin-bottom:12px;">Добавить / обновить вручную</div>
+      <div style="font-weight:700;margin-bottom:12px;">Добавить или обновить документ вручную</div>
       <form method="post" enctype="multipart/form-data" action="{{ url_for('avito_module.avito_knowledge_upsert', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
         <input type="hidden" name="doc_id" value="">
-        <label>Заголовок<input type="text" name="title" placeholder="Например: FAQ по коляске 2в1"></label>
-        <label>Тип
+        <label class="field"><span class="field-label">Заголовок</span><input type="text" name="title" placeholder="Например: FAQ по коляске 2 в 1"><span class="hint">Понятное название документа. По нему потом удобно искать запись в интерфейсе.</span></label>
+        <label class="field"><span class="field-label">Тип документа</span>
           <select name="kind">
             {% for value in ['faq', 'listing_card', 'policy', 'shipping', 'condition', 'size', 'script', 'qa'] %}
-              <option value="{{ value }}">{{ value }}</option>
+              <option value="{{ value }}">{{ avito_option_label('knowledge_kind', value) }}</option>
             {% endfor %}
           </select>
+          <span class="hint">Выбери смысловой тип: FAQ, карточка объявления, правило, доставка, состояние товара и т.д.</span>
         </label>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Item ID<input type="text" name="item_id"></label>
-          <label style="flex:2;min-width:220px;">Item title<input type="text" name="item_title"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">ID товара</span><input type="text" name="item_id"><span class="hint">Необязательный внутренний или Avito ID объявления / товара.</span></label>
+          <label class="field" style="flex:2;min-width:220px;"><span class="field-label">Название товара</span><input type="text" name="item_title"><span class="hint">Название товара или объявления, к которому относятся эти знания.</span></label>
         </div>
-        <label>Теги<input type="text" name="tags" placeholder="faq, доставка, stroller"></label>
+        <label class="field"><span class="field-label">Теги</span><input type="text" name="tags" placeholder="частые вопросы, доставка, коляска"><span class="hint">Слова для быстрого поиска: категории, темы, SKU, ключевые фразы. Вводи через запятую.</span></label>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Источник<input type="text" name="source_name" placeholder="Google Doc / FAQ / менеджер"></label>
-          <label style="flex:2;min-width:220px;">Source URL<input type="text" name="source_url" placeholder="https://..."></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Название источника</span><input type="text" name="source_name" placeholder="Документ / таблица / заметки менеджера"><span class="hint">Короткое имя источника для понимания происхождения знания.</span></label>
+          <label class="field" style="flex:2;min-width:220px;"><span class="field-label">Ссылка на источник</span><input type="text" name="source_url" placeholder="https://..."><span class="hint">Необязательная ссылка на первоисточник, если документ взят из внешнего файла или веб-страницы.</span></label>
         </div>
-        <label>Текст документа<textarea rows="12" name="body_text" placeholder="Сюда можно вставить описание товара, FAQ, условия доставки, таблицу размеров..."></textarea></label>
-        <label>Или загрузить текстовый файл<input type="file" name="upload_file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,application/json"></label>
-        <label>Внутренние заметки<input type="text" name="meta_notes"></label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="active" checked> активный документ</label>
+        <label class="field"><span class="field-label">Текст документа</span><textarea rows="12" name="body_text" placeholder="Сюда можно вставить описание товара, FAQ, условия доставки, таблицу размеров..."></textarea><span class="hint">Это основной текст, по которому модуль будет искать факты и формировать ответы.</span></label>
+        <label class="field"><span class="field-label">Или загрузить текстовый файл</span><input type="file" name="upload_file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,application/json"><span class="hint">Если файл загружен, а поле текста пустое, модуль возьмёт содержимое из файла.</span></label>
+        <label class="field"><span class="field-label">Внутренние заметки</span><input type="text" name="meta_notes"><span class="hint">Техническая заметка для команды: например, когда обновляли данные или откуда их проверяли.</span></label>
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="active" checked> Использовать этот документ в поиске и генерации</label>
         <button type="submit">Сохранить документ</button>
       </form>
       {% else %}
@@ -101,12 +112,12 @@
     </div>
 
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Документы</div>
+      <div style="font-weight:700;margin-bottom:12px;">Документы базы знаний</div>
       <form method="get" action="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}" class="row" style="margin-bottom:12px;">
-        <input type="text" name="q" value="{{ kb_search }}" placeholder="Поиск по title/body/item/tags" style="flex:2;min-width:260px;">
+        <input type="text" name="q" value="{{ kb_search }}" placeholder="Поиск по заголовку, тексту, товару и тегам" style="flex:2;min-width:260px;">
         <select name="kind" style="flex:1;min-width:160px;">
           {% for value in kb_kinds %}
-            <option value="{{ value }}" {% if kb_kind == value %}selected{% endif %}>{{ value }}</option>
+            <option value="{{ value }}" {% if kb_kind == value %}selected{% endif %}>{{ 'Все типы' if value == 'all' else avito_option_label('knowledge_kind', value) }}</option>
           {% endfor %}
         </select>
         <button type="submit" class="ghost">Найти</button>
@@ -116,9 +127,9 @@
           <div class="row" style="justify-content:space-between;align-items:flex-start;">
             <div>
               <div style="font-weight:700;">{{ doc.title }}</div>
-              <div class="muted">kind={{ doc.kind }} · item={{ doc.item_title or doc.item_id or '—' }} · active={{ 'yes' if doc.active else 'no' }}</div>
-              {% if doc.tags %}<div class="muted">tags={{ doc.tags | join(', ') }}</div>{% endif %}
-              {% if doc.source_name or doc.source_url %}<div class="muted">source={{ doc.source_name or '—' }} {% if doc.source_url %}<code>{{ doc.source_url }}</code>{% endif %}</div>{% endif %}
+              <div class="muted">Тип: {{ avito_option_label('knowledge_kind', doc.kind) }} · Товар: {{ doc.item_title or doc.item_id or 'не указан' }} · Активность: {{ 'включён' if doc.active else 'выключен' }}</div>
+              {% if doc.tags %}<div class="muted">Теги: {{ doc.tags | join(', ') }}</div>{% endif %}
+              {% if doc.source_name or doc.source_url %}<div class="muted">Источник: {{ doc.source_name or 'не указан' }} {% if doc.source_url %}· <code>{{ doc.source_url }}</code>{% endif %}</div>{% endif %}
             </div>
             {% if avito_permissions.ai_rules %}
             <form method="post" action="{{ url_for('avito_module.avito_knowledge_delete', tenant_id=active_tenant_id, doc_id=doc.doc_id) }}" onsubmit="return confirm('Удалить документ базы знаний?');">
@@ -127,7 +138,7 @@
             {% endif %}
           </div>
           <div style="margin-top:10px;white-space:pre-wrap;">{{ doc.body_text[:1200] }}{% if doc.body_text|length > 1200 %}…{% endif %}</div>
-          <div class="muted" style="margin-top:8px;">updated={{ doc.updated_at }}</div>
+          <div class="muted" style="margin-top:8px;">Обновлён: {{ doc.updated_at }}</div>
         </div>
       {% else %}
         <div class="muted">Документов пока нет.</div>

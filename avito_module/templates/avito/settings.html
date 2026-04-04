@@ -16,7 +16,12 @@
     button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
     .muted { color:#64748b; font-size:13px; }
     .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+    .field { display:grid; gap:6px; }
+    .field-label { font-weight:600; }
+    .hint { color:#64748b; font-size:12px; line-height:1.45; }
+    .check { display:flex; gap:8px; align-items:center; font-weight:600; }
+    .section-note { margin:-4px 0 6px; color:#64748b; font-size:13px; }
     code { background:#0f172a; color:#e2e8f0; padding:2px 6px; border-radius:8px; }
   </style>
 </head>
@@ -26,13 +31,15 @@
     <div>
       <div style="font-size:22px;font-weight:700;">Настройки Avito</div>
       <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
-      <div class="muted">Webhook URL: <code>{{ avito_webhook_url }}</code></div>
+      <div class="muted">Адрес вебхука: <code>{{ avito_webhook_url }}</code></div>
     </div>
     <div class="row">
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
-      <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">HITL очередь</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
+      <a href="{{ url_for('avito_module.avito_operator', tenant_id=active_tenant_id) }}">Операторская очередь</a>
+        <a href="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}">Очередь проверки</a>
       <a href="{{ url_for('avito_module.avito_knowledge', tenant_id=active_tenant_id) }}">База знаний</a>
       <a href="{{ url_for('avito_module.avito_media', tenant_id=active_tenant_id) }}">Медиа</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
@@ -46,164 +53,245 @@
 
   <div class="grid">
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Connect / secrets</div>
+      <div style="font-weight:700;margin-bottom:12px;">Подключение и секреты</div>
+      <div class="section-note">Здесь хранятся параметры доступа к Avito API, ИИ-провайдеру и защите вебхука.</div>
       {% if avito_permissions.connect %}
-      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
-        <label>Client ID<input type="text" name="client_id" value="{{ config_edit.client_id or '' }}"></label>
-        <label>Client secret<input type="text" name="client_secret" value="{{ config_edit.client_secret or '' }}"></label>
-        <label>User ID / account ID<input type="text" name="user_id" value="{{ config_edit.user_id or '' }}"></label>
-        <label>AI API key<input type="text" name="ai_api_key" value="{{ config_edit.ai_api_key or '' }}"></label>
-        <label>AI base URL<input type="text" name="ai_base_url" value="{{ config_edit.ai_base_url or '' }}"></label>
-        <label>Webhook secret<input type="text" name="webhook_secret" value="{{ config_edit.webhook_secret or '' }}"></label>
-        <button type="submit">Сохранить connect-настройки</button>
+      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:12px;">
+        <label class="field"><span class="field-label">ID приложения Avito</span><input type="text" name="client_id" value="{{ config_edit.client_id or '' }}"><span class="hint">{{ avito_field_hint('client_id') }}</span></label>
+        <label class="field"><span class="field-label">Секрет приложения Avito</span><input type="text" name="client_secret" value="{{ config_edit.client_secret or '' }}"><span class="hint">{{ avito_field_hint('client_secret') }}</span></label>
+        <label class="field"><span class="field-label">ID пользователя / аккаунта Avito</span><input type="text" name="user_id" value="{{ config_edit.user_id or '' }}"><span class="hint">{{ avito_field_hint('user_id') }}</span></label>
+        <label class="field"><span class="field-label">Ключ API для ИИ</span><input type="text" name="ai_api_key" value="{{ config_edit.ai_api_key or '' }}"><span class="hint">{{ avito_field_hint('ai_api_key') }}</span></label>
+        <label class="field"><span class="field-label">Базовый адрес API ИИ</span><input type="text" name="ai_base_url" value="{{ config_edit.ai_base_url or '' }}"><span class="hint">{{ avito_field_hint('ai_base_url') }}</span></label>
+        <label class="field"><span class="field-label">Секрет вебхука</span><input type="text" name="webhook_secret" value="{{ config_edit.webhook_secret or '' }}"><span class="hint">{{ avito_field_hint('webhook_secret') }}</span></label>
+        <button type="submit">Сохранить параметры подключения</button>
       </form>
       {% else %}
-        <div class="muted">Нет прав на изменение connect-настроек.</div>
+        <div class="muted">Нет прав на изменение параметров подключения.</div>
       {% endif %}
 
-      <form method="post" action="{{ url_for('avito_module.avito_browser_bootstrap', tenant_id=active_tenant_id) }}" style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <input type="number" name="timeout_seconds" value="{{ avito_config.browser_bootstrap_timeout_seconds }}" min="30" max="3600" style="width:120px;">
-        <button type="submit" class="ghost">Сохранить browser state</button>
+      <form method="post" action="{{ url_for('avito_module.avito_browser_bootstrap', tenant_id=active_tenant_id) }}" style="margin-top:14px;display:grid;gap:10px;">
+        <label class="field"><span class="field-label">Таймаут сохранения состояния браузера, сек</span><input type="number" name="timeout_seconds" value="{{ avito_config.browser_bootstrap_timeout_seconds }}" min="30" max="3600"><span class="hint">{{ avito_field_hint('browser_bootstrap_timeout_seconds') }}</span></label>
+        <button type="submit" class="ghost">Открыть браузер и сохранить состояние</button>
       </form>
-      <div class="muted" style="margin-top:12px;">State-файл: <code>{{ avito_browser_state.path }}</code></div>
+      <div class="muted" style="margin-top:12px;">Файл состояния браузера: <code>{{ avito_browser_state.path }}</code></div>
     </div>
 
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">AI / Knowledge / HITL</div>
+      <div style="font-weight:700;margin-bottom:12px;">ИИ, база знаний и ручная проверка</div>
+      <div class="section-note">Здесь настраиваются генерация ответов, использование базы знаний, поиск похожих диалогов и очередь ручной проверки.</div>
       {% if avito_permissions.ai_rules %}
-      <form method="post" action="{{ url_for('avito_module.avito_settings_ai', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
-        <label>Auto mode
+      <form method="post" action="{{ url_for('avito_module.avito_settings_ai', tenant_id=active_tenant_id) }}" style="display:grid;gap:12px;">
+        <label class="field"><span class="field-label">Режим автоматизации</span>
           <select name="auto_mode">
             {% for value in ['disabled', 'draft_only', 'simple_only', 'all'] %}
-              <option value="{{ value }}" {% if avito_config.auto_mode == value %}selected{% endif %}>{{ value }}</option>
+              <option value="{{ value }}" {% if avito_config.auto_mode == value %}selected{% endif %}>{{ avito_option_label('auto_mode', value) }}</option>
             {% endfor %}
           </select>
+          <span class="hint">{{ avito_field_hint('auto_mode') }}</span>
         </label>
-        <label>AI model<input type="text" name="ai_model" value="{{ avito_config.ai_model or '' }}"></label>
-        <label>Auto-send confidence threshold<input type="number" step="0.01" min="0" max="1" name="auto_send_confidence_threshold" value="{{ avito_config.auto_send_confidence_threshold }}"></label>
-        <label>Max context messages<input type="number" name="max_context_messages" min="1" max="100" value="{{ avito_config.max_context_messages }}"></label>
-        <label>System prompt<textarea name="system_prompt" rows="6">{{ avito_config.system_prompt or '' }}</textarea></label>
-        <label>Knowledge text<textarea name="knowledge_text" rows="5">{{ avito_config.knowledge_text or '' }}</textarea></label>
+        <label class="field"><span class="field-label">Модель ИИ</span><input type="text" name="ai_model" value="{{ avito_config.ai_model or '' }}"><span class="hint">{{ avito_field_hint('ai_model') }}</span></label>
+        <label class="field"><span class="field-label">Порог уверенности для автоотправки</span><input type="number" step="0.01" min="0" max="1" name="auto_send_confidence_threshold" value="{{ avito_config.auto_send_confidence_threshold }}"><span class="hint">{{ avito_field_hint('auto_send_confidence_threshold') }}</span></label>
+        <label class="field"><span class="field-label">Максимум сообщений в контексте</span><input type="number" name="max_context_messages" min="1" max="100" value="{{ avito_config.max_context_messages }}"><span class="hint">{{ avito_field_hint('max_context_messages') }}</span></label>
+        <label class="field"><span class="field-label">Системная инструкция для ИИ</span><textarea name="system_prompt" rows="6">{{ avito_config.system_prompt or '' }}</textarea><span class="hint">{{ avito_field_hint('system_prompt') }}</span></label>
+        <label class="field"><span class="field-label">Общий текст базы знаний</span><textarea name="knowledge_text" rows="5">{{ avito_config.knowledge_text or '' }}</textarea><span class="hint">{{ avito_field_hint('knowledge_text') }}</span></label>
         <div class="row">
-          <label style="flex:1;min-width:220px;">Knowledge mode
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Как использовать базу знаний</span>
             <select name="knowledge_mode">
               {% for value in ['disabled', 'assist', 'require_for_auto'] %}
-                <option value="{{ value }}" {% if avito_config.knowledge_mode == value %}selected{% endif %}>{{ value }}</option>
+                <option value="{{ value }}" {% if avito_config.knowledge_mode == value %}selected{% endif %}>{{ avito_option_label('knowledge_mode', value) }}</option>
               {% endfor %}
             </select>
+            <span class="hint">{{ avito_field_hint('knowledge_mode') }}</span>
           </label>
-          <label style="flex:1;min-width:180px;">Knowledge max hits<input type="number" name="knowledge_max_hits" min="1" max="20" value="{{ avito_config.knowledge_max_hits }}"></label>
-          <label style="flex:1;min-width:180px;">Knowledge min score<input type="number" step="0.01" min="0" max="5" name="knowledge_min_score" value="{{ avito_config.knowledge_min_score }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Макс. фрагментов знаний</span><input type="number" name="knowledge_max_hits" min="1" max="20" value="{{ avito_config.knowledge_max_hits }}"><span class="hint">{{ avito_field_hint('knowledge_max_hits') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Мин. порог релевантности</span><input type="number" step="0.01" min="0" max="5" name="knowledge_min_score" value="{{ avito_config.knowledge_min_score }}"><span class="hint">{{ avito_field_hint('knowledge_min_score') }}</span></label>
         </div>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Chunk chars<input type="number" name="knowledge_chunk_chars" min="200" max="5000" value="{{ avito_config.knowledge_chunk_chars }}"></label>
-          <label style="flex:1;min-width:180px;">Chunk overlap<input type="number" name="knowledge_chunk_overlap_chars" min="0" max="1500" value="{{ avito_config.knowledge_chunk_overlap_chars }}"></label>
-          <label style="flex:1;min-width:180px;">Answer style
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Размер чанка, символов</span><input type="number" name="knowledge_chunk_chars" min="200" max="5000" value="{{ avito_config.knowledge_chunk_chars }}"><span class="hint">{{ avito_field_hint('knowledge_chunk_chars') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Перекрытие чанков</span><input type="number" name="knowledge_chunk_overlap_chars" min="0" max="1500" value="{{ avito_config.knowledge_chunk_overlap_chars }}"><span class="hint">{{ avito_field_hint('knowledge_chunk_overlap_chars') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Стиль ответа</span>
             <select name="knowledge_answer_style">
               {% for value in ['grounded', 'concise', 'sales'] %}
-                <option value="{{ value }}" {% if avito_config.knowledge_answer_style == value %}selected{% endif %}>{{ value }}</option>
+                <option value="{{ value }}" {% if avito_config.knowledge_answer_style == value %}selected{% endif %}>{{ avito_option_label('knowledge_answer_style', value) }}</option>
               {% endfor %}
             </select>
+            <span class="hint">{{ avito_field_hint('knowledge_answer_style') }}</span>
           </label>
         </div>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="knowledge_enabled" {% if avito_config.knowledge_enabled %}checked{% endif %}> knowledge enabled</label>
+        <div>
+          <label class="check"><input type="checkbox" name="knowledge_enabled" {% if avito_config.knowledge_enabled %}checked{% endif %}> Включить базу знаний</label>
+          <div class="hint">{{ avito_field_hint('knowledge_enabled') }}</div>
+        </div>
 
         <div style="font-weight:700;margin-top:4px;">Похожие диалоги</div>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="similar_dialogs_enabled" {% if avito_config.similar_dialogs_enabled %}checked{% endif %}> similar dialogs enabled</label>
+        <div>
+          <label class="check"><input type="checkbox" name="similar_dialogs_enabled" {% if avito_config.similar_dialogs_enabled %}checked{% endif %}> Использовать похожие прошлые диалоги</label>
+          <div class="hint">{{ avito_field_hint('similar_dialogs_enabled') }}</div>
+        </div>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Max similar hits<input type="number" name="similar_dialogs_max_hits" min="1" max="12" value="{{ avito_config.similar_dialogs_max_hits }}"></label>
-          <label style="flex:1;min-width:180px;">Min similar score<input type="number" step="0.01" min="0" max="5" name="similar_dialogs_min_score" value="{{ avito_config.similar_dialogs_min_score }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Макс. похожих диалогов</span><input type="number" name="similar_dialogs_max_hits" min="1" max="12" value="{{ avito_config.similar_dialogs_max_hits }}"><span class="hint">{{ avito_field_hint('similar_dialogs_max_hits') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Мин. порог похожести</span><input type="number" step="0.01" min="0" max="5" name="similar_dialogs_min_score" value="{{ avito_config.similar_dialogs_min_score }}"><span class="hint">{{ avito_field_hint('similar_dialogs_min_score') }}</span></label>
         </div>
 
-        <div style="font-weight:700;margin-top:4px;">Human-in-the-loop</div>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="hitl_enabled" {% if avito_config.hitl_enabled %}checked{% endif %}> HITL enabled</label>
+        <div style="font-weight:700;margin-top:4px;">Ручная проверка ответов</div>
+        <div>
+          <label class="check"><input type="checkbox" name="hitl_enabled" {% if avito_config.hitl_enabled %}checked{% endif %}> Включить очередь ручной проверки</label>
+          <div class="hint">{{ avito_field_hint('hitl_enabled') }}</div>
+        </div>
         <div class="row">
-          <label style="flex:1;min-width:220px;">Auto-ready threshold<input type="number" step="0.001" min="0" max="1" name="hitl_auto_ready_threshold" value="{{ avito_config.hitl_auto_ready_threshold }}"></label>
-          <label style="flex:1;min-width:220px;">Default assignee<input type="text" name="hitl_queue_default_assignee" value="{{ avito_config.hitl_queue_default_assignee or '' }}"></label>
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Порог авто-перевода в состояние «готово»</span><input type="number" step="0.001" min="0" max="1" name="hitl_auto_ready_threshold" value="{{ avito_config.hitl_auto_ready_threshold }}"><span class="hint">{{ avito_field_hint('hitl_auto_ready_threshold') }}</span></label>
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Исполнитель по умолчанию</span><input type="text" name="hitl_queue_default_assignee" value="{{ avito_config.hitl_queue_default_assignee or '' }}"><span class="hint">{{ avito_field_hint('hitl_queue_default_assignee') }}</span></label>
         </div>
 
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="media_registry_enabled" {% if avito_config.media_registry_enabled %}checked{% endif %}> media registry enabled</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="media_auto_suggest_enabled" {% if avito_config.media_auto_suggest_enabled %}checked{% endif %}> media auto suggest enabled</label>
-        <label>Media max suggestions<input type="number" name="media_max_suggestions" min="1" max="20" value="{{ avito_config.media_max_suggestions }}"></label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="media_send_enabled" {% if avito_config.media_send_enabled %}checked{% endif %}> live media send enabled</label>
+        <div style="font-weight:700;margin-top:4px;">Медиа</div>
+        <div>
+          <label class="check"><input type="checkbox" name="media_registry_enabled" {% if avito_config.media_registry_enabled %}checked{% endif %}> Включить медиа-реестр</label>
+          <div class="hint">{{ avito_field_hint('media_registry_enabled') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="media_auto_suggest_enabled" {% if avito_config.media_auto_suggest_enabled %}checked{% endif %}> Автоподбор медиа</label>
+          <div class="hint">{{ avito_field_hint('media_auto_suggest_enabled') }}</div>
+        </div>
+        <label class="field"><span class="field-label">Макс. подсказок медиа</span><input type="number" name="media_max_suggestions" min="1" max="20" value="{{ avito_config.media_max_suggestions }}"><span class="hint">{{ avito_field_hint('media_max_suggestions') }}</span></label>
+        <div>
+          <label class="check"><input type="checkbox" name="media_send_enabled" {% if avito_config.media_send_enabled %}checked{% endif %}> Разрешить живую отправку вложений</label>
+          <div class="hint">{{ avito_field_hint('media_send_enabled') }}</div>
+        </div>
         <div class="row">
-          <label style="flex:1;min-width:220px;">Media transport
+          <label class="field" style="flex:1;min-width:220px;"><span class="field-label">Транспорт отправки медиа</span>
             <select name="media_send_transport">
               {% for value in ['disabled', 'browser_first', 'browser_only', 'api_first', 'api_only'] %}
-                <option value="{{ value }}" {% if avito_config.media_send_transport == value %}selected{% endif %}>{{ value }}</option>
+                <option value="{{ value }}" {% if avito_config.media_send_transport == value %}selected{% endif %}>{{ avito_option_label('media_send_transport', value) }}</option>
               {% endfor %}
             </select>
+            <span class="hint">{{ avito_field_hint('media_send_transport') }}</span>
           </label>
-          <label style="flex:1;min-width:180px;">Max send assets<input type="number" name="media_max_send_assets" min="1" max="20" value="{{ avito_config.media_max_send_assets }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Макс. файлов в одном ответе</span><input type="number" name="media_max_send_assets" min="1" max="20" value="{{ avito_config.media_max_send_assets }}"><span class="hint">{{ avito_field_hint('media_max_send_assets') }}</span></label>
         </div>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="media_send_images_only" {% if avito_config.media_send_images_only %}checked{% endif %}> send images only</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="media_browser_send_headless" {% if avito_config.media_browser_send_headless %}checked{% endif %}> browser media send in headless mode</label>
-        <label>Media API upload endpoint (optional)<input type="text" name="media_api_upload_endpoint" value="{{ avito_config.media_api_upload_endpoint or '' }}" placeholder="/messenger/.../attachments"></label>
-        <label>Media API send endpoint (optional)<input type="text" name="media_api_send_endpoint" value="{{ avito_config.media_api_send_endpoint or '' }}" placeholder="/messenger/.../messages"></label>
-        <button type="submit">Сохранить AI-настройки</button>
+        <div>
+          <label class="check"><input type="checkbox" name="media_send_images_only" {% if avito_config.media_send_images_only %}checked{% endif %}> Отправлять только изображения</label>
+          <div class="hint">{{ avito_field_hint('media_send_images_only') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="media_browser_send_headless" {% if avito_config.media_browser_send_headless %}checked{% endif %}> Разрешить отправку медиа через браузер без видимого окна</label>
+          <div class="hint">{{ avito_field_hint('media_browser_send_headless') }}</div>
+        </div>
+        <label class="field"><span class="field-label">Путь API для загрузки медиа (необязательно)</span><input type="text" name="media_api_upload_endpoint" value="{{ avito_config.media_api_upload_endpoint or '' }}" placeholder="/messenger/.../attachments"><span class="hint">{{ avito_field_hint('media_api_upload_endpoint') }}</span></label>
+        <label class="field"><span class="field-label">Путь API для отправки медиа (необязательно)</span><input type="text" name="media_api_send_endpoint" value="{{ avito_config.media_api_send_endpoint or '' }}" placeholder="/messenger/.../messages"><span class="hint">{{ avito_field_hint('media_api_send_endpoint') }}</span></label>
+        <button type="submit">Сохранить настройки ИИ</button>
       </form>
       {% else %}
-        <div class="muted">Нет прав на изменение AI-настроек.</div>
+        <div class="muted">Нет прав на изменение настроек ИИ.</div>
       {% endif %}
     </div>
 
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Sync / Webhook / Security</div>
+      <div style="font-weight:700;margin-bottom:12px;">Синхронизация, вебхук и устойчивость</div>
+      <div class="section-note">Блок задаёт резервные каналы, заголовки вебхука и базовые правила безопасной доставки событий.</div>
       {% if avito_permissions.connect %}
-      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
-        <label>Polling interval seconds<input type="number" name="polling_interval_seconds" min="5" max="3600" value="{{ avito_config.polling_interval_seconds }}"></label>
+      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:12px;">
+        <label class="field"><span class="field-label">Интервал резервного опроса API, сек.</span><input type="number" name="polling_interval_seconds" min="5" max="3600" value="{{ avito_config.polling_interval_seconds }}"><span class="hint">{{ avito_field_hint('polling_interval_seconds') }}</span></label>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Sync page limit<input type="number" name="sync_page_limit" min="1" max="500" value="{{ avito_config.sync_page_limit }}"></label>
-          <label style="flex:1;min-width:180px;">Sync max pages<input type="number" name="sync_max_pages" min="1" max="100" value="{{ avito_config.sync_max_pages }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Лимит объектов на страницу</span><input type="number" name="sync_page_limit" min="1" max="500" value="{{ avito_config.sync_page_limit }}"><span class="hint">{{ avito_field_hint('sync_page_limit') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Макс. страниц за синк</span><input type="number" name="sync_max_pages" min="1" max="100" value="{{ avito_config.sync_max_pages }}"><span class="hint">{{ avito_field_hint('sync_max_pages') }}</span></label>
         </div>
-        <label>Webhook query param<input type="text" name="webhook_query_param" value="{{ avito_config.webhook_query_param }}"></label>
-        <label>Webhook signature header<input type="text" name="webhook_signature_header" value="{{ avito_config.webhook_signature_header }}"></label>
-        <label>Webhook timestamp header<input type="text" name="webhook_timestamp_header" value="{{ avito_config.webhook_timestamp_header }}"></label>
-        <label>Webhook nonce header<input type="text" name="webhook_nonce_header" value="{{ avito_config.webhook_nonce_header }}"></label>
-        <label>Webhook event id header<input type="text" name="webhook_event_id_header" value="{{ avito_config.webhook_event_id_header }}"></label>
+        <label class="field"><span class="field-label">Имя query-параметра вебхука (совместимость) (режим совместимости)</span><input type="text" name="webhook_query_param" value="{{ avito_config.webhook_query_param }}"><span class="hint">{{ avito_field_hint('webhook_query_param') }}</span></label>
+        <label class="field"><span class="field-label">Заголовок подписи вебхука</span><input type="text" name="webhook_signature_header" value="{{ avito_config.webhook_signature_header }}"><span class="hint">{{ avito_field_hint('webhook_signature_header') }}</span></label>
+        <label class="field"><span class="field-label">Заголовок времени вебхука</span><input type="text" name="webhook_timestamp_header" value="{{ avito_config.webhook_timestamp_header }}"><span class="hint">{{ avito_field_hint('webhook_timestamp_header') }}</span></label>
+        <label class="field"><span class="field-label">Заголовок nonce вебхука</span><input type="text" name="webhook_nonce_header" value="{{ avito_config.webhook_nonce_header }}"><span class="hint">{{ avito_field_hint('webhook_nonce_header') }}</span></label>
+        <label class="field"><span class="field-label">Заголовок ID события вебхука</span><input type="text" name="webhook_event_id_header" value="{{ avito_config.webhook_event_id_header }}"><span class="hint">{{ avito_field_hint('webhook_event_id_header') }}</span></label>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Webhook allowed skew<input type="number" name="webhook_allowed_skew_seconds" min="10" max="7200" value="{{ avito_config.webhook_allowed_skew_seconds }}"></label>
-          <label style="flex:1;min-width:180px;">Webhook nonce TTL<input type="number" name="webhook_nonce_ttl_seconds" min="60" max="7200" value="{{ avito_config.webhook_nonce_ttl_seconds }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Допустимый сдвиг времени, сек</span><input type="number" name="webhook_allowed_skew_seconds" min="10" max="7200" value="{{ avito_config.webhook_allowed_skew_seconds }}"><span class="hint">{{ avito_field_hint('webhook_allowed_skew_seconds') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Срок жизни nonce, сек.</span><input type="number" name="webhook_nonce_ttl_seconds" min="60" max="7200" value="{{ avito_config.webhook_nonce_ttl_seconds }}"><span class="hint">{{ avito_field_hint('webhook_nonce_ttl_seconds') }}</span></label>
         </div>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="browser_fallback_enabled" {% if avito_config.browser_fallback_enabled %}checked{% endif %}> browser fallback enabled</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="polling_fallback_enabled" {% if avito_config.polling_fallback_enabled %}checked{% endif %}> polling fallback enabled</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="webhook_first_enabled" {% if avito_config.webhook_first_enabled %}checked{% endif %}> webhook-first enabled</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="webhook_auto_generate_draft" {% if avito_config.webhook_auto_generate_draft %}checked{% endif %}> auto-generate draft on webhook</label>
-        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="webhook_require_signature" {% if avito_config.webhook_require_signature %}checked{% endif %}> require signature when header exists</label>
-        <button type="submit">Сохранить sync/webhook-настройки</button>
+        <div>
+          <label class="check"><input type="checkbox" name="browser_fallback_enabled" {% if avito_config.browser_fallback_enabled %}checked{% endif %}> Включить резерв через браузер</label>
+          <div class="hint">{{ avito_field_hint('browser_fallback_enabled') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="polling_fallback_enabled" {% if avito_config.polling_fallback_enabled %}checked{% endif %}> Включить резервный опрос API</label>
+          <div class="hint">{{ avito_field_hint('polling_fallback_enabled') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="webhook_first_enabled" {% if avito_config.webhook_first_enabled %}checked{% endif %}> Сделать вебхук основным каналом</label>
+          <div class="hint">{{ avito_field_hint('webhook_first_enabled') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="webhook_auto_generate_draft" {% if avito_config.webhook_auto_generate_draft %}checked{% endif %}> Генерировать черновик сразу после вебхука</label>
+          <div class="hint">{{ avito_field_hint('webhook_auto_generate_draft') }}</div>
+        </div>
+        <div>
+          <label class="check"><input type="checkbox" name="webhook_require_signature" {% if avito_config.webhook_require_signature %}checked{% endif %}> Требовать подпись вебхука</label>
+          <div class="hint">{{ avito_field_hint('webhook_require_signature') }}</div>
+        </div>
+        <button type="submit">Сохранить настройки синхронизации и вебхука</button>
       </form>
       {% endif %}
     </div>
 
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Token guardian / RBAC</div>
+      <div style="font-weight:700;margin-bottom:12px;">Защита токена и права доступа</div>
+      <div class="section-note">Здесь настраиваются повторные попытки API, предохранитель ошибок и права доступа для разных действий в модуле Avito.</div>
       {% if avito_permissions.connect %}
-      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:10px;">
+      <form method="post" action="{{ url_for('avito_module.avito_settings_security', tenant_id=active_tenant_id) }}" style="display:grid;gap:12px;">
         <div class="row">
-          <label style="flex:1;min-width:180px;">Retry budget<input type="number" name="api_retry_budget" min="1" max="20" value="{{ avito_config.api_retry_budget }}"></label>
-          <label style="flex:1;min-width:180px;">Backoff base<input type="number" step="0.1" name="api_backoff_base_seconds" min="0.1" max="120" value="{{ avito_config.api_backoff_base_seconds }}"></label>
-          <label style="flex:1;min-width:180px;">Backoff max<input type="number" step="0.1" name="api_backoff_max_seconds" min="0.1" max="300" value="{{ avito_config.api_backoff_max_seconds }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Бюджет повторных попыток</span><input type="number" name="api_retry_budget" min="1" max="20" value="{{ avito_config.api_retry_budget }}"><span class="hint">{{ avito_field_hint('api_retry_budget') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Базовая пауза между повторами, сек.</span><input type="number" step="0.1" name="api_backoff_base_seconds" min="0.1" max="120" value="{{ avito_config.api_backoff_base_seconds }}"><span class="hint">{{ avito_field_hint('api_backoff_base_seconds') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Максимальная пауза между повторами, сек.</span><input type="number" step="0.1" name="api_backoff_max_seconds" min="0.1" max="300" value="{{ avito_config.api_backoff_max_seconds }}"><span class="hint">{{ avito_field_hint('api_backoff_max_seconds') }}</span></label>
         </div>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Requests per minute<input type="number" name="api_max_requests_per_minute" min="1" max="600" value="{{ avito_config.api_max_requests_per_minute }}"></label>
-          <label style="flex:1;min-width:180px;">Min request interval ms<input type="number" name="api_min_request_interval_ms" min="0" max="10000" value="{{ avito_config.api_min_request_interval_ms }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Запросов в минуту</span><input type="number" name="api_max_requests_per_minute" min="1" max="600" value="{{ avito_config.api_max_requests_per_minute }}"><span class="hint">{{ avito_field_hint('api_max_requests_per_minute') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Мин. интервал между запросами, мс</span><input type="number" name="api_min_request_interval_ms" min="0" max="10000" value="{{ avito_config.api_min_request_interval_ms }}"><span class="hint">{{ avito_field_hint('api_min_request_interval_ms') }}</span></label>
         </div>
         <div class="row">
-          <label style="flex:1;min-width:180px;">Circuit threshold<input type="number" name="api_circuit_breaker_threshold" min="1" max="20" value="{{ avito_config.api_circuit_breaker_threshold }}"></label>
-          <label style="flex:1;min-width:180px;">Circuit cooldown seconds<input type="number" name="api_circuit_breaker_cooldown_seconds" min="5" max="3600" value="{{ avito_config.api_circuit_breaker_cooldown_seconds }}"></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Порог открытия предохранителя ошибок</span><input type="number" name="api_circuit_breaker_threshold" min="1" max="20" value="{{ avito_config.api_circuit_breaker_threshold }}"><span class="hint">{{ avito_field_hint('api_circuit_breaker_threshold') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Пауза после открытия предохранителя, сек</span><input type="number" name="api_circuit_breaker_cooldown_seconds" min="5" max="3600" value="{{ avito_config.api_circuit_breaker_cooldown_seconds }}"><span class="hint">{{ avito_field_hint('api_circuit_breaker_cooldown_seconds') }}</span></label>
         </div>
-        <div style="font-weight:700;margin-top:6px;">RBAC</div>
-        <label>View users<input type="text" name="rbac_view_users" value="{{ avito_config.rbac_view_users | join(', ') }}"></label>
-        <label>Reply users<input type="text" name="rbac_reply_users" value="{{ avito_config.rbac_reply_users | join(', ') }}"></label>
-        <label>Bulk send users<input type="text" name="rbac_bulk_send_users" value="{{ avito_config.rbac_bulk_send_users | join(', ') }}"></label>
-        <label>AI rules users<input type="text" name="rbac_ai_rules_users" value="{{ avito_config.rbac_ai_rules_users | join(', ') }}"></label>
-        <label>Connect users<input type="text" name="rbac_connect_users" value="{{ avito_config.rbac_connect_users | join(', ') }}"></label>
-        <label>Secret-view users<input type="text" name="rbac_secret_users" value="{{ avito_config.rbac_secret_users | join(', ') }}"></label>
-        <label>Admin users<input type="text" name="rbac_admin_users" value="{{ avito_config.rbac_admin_users | join(', ') }}"></label>
-        <button type="submit">Сохранить security-настройки</button>
+        <div style="font-weight:700;margin-top:6px;">Здоровье и алерты</div>
+        <div>
+          <label class="check"><input type="checkbox" name="health_alerts_enabled" {% if avito_config.health_alerts_enabled %}checked{% endif %}> Включить health-dashboard и сигналы</label>
+          <div class="hint">{{ avito_field_hint('health_alerts_enabled') }}</div>
+        </div>
+        <div class="row">
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Тишина webhook, часов</span><input type="number" name="health_webhook_silent_hours" min="1" max="168" value="{{ avito_config.health_webhook_silent_hours }}"><span class="hint">{{ avito_field_hint('health_webhook_silent_hours') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Отклонённые webhook, %</span><input type="number" step="0.1" name="health_alert_webhook_verify_fail_pct" min="0" max="100" value="{{ avito_config.health_alert_webhook_verify_fail_pct }}"><span class="hint">{{ avito_field_hint('health_alert_webhook_verify_fail_pct') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Refresh токена за час</span><input type="number" name="health_alert_token_refresh_events_60m" min="1" max="500" value="{{ avito_config.health_alert_token_refresh_events_60m }}"><span class="hint">{{ avito_field_hint('health_alert_token_refresh_events_60m') }}</span></label>
+        </div>
+        <div class="row">
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Срабатывания circuit breaker за час</span><input type="number" name="health_alert_circuit_open_events_60m" min="1" max="100" value="{{ avito_config.health_alert_circuit_open_events_60m }}"><span class="hint">{{ avito_field_hint('health_alert_circuit_open_events_60m') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Browser fallback, %</span><input type="number" step="0.1" name="health_alert_browser_fallback_share_pct" min="0" max="100" value="{{ avito_config.health_alert_browser_fallback_share_pct }}"><span class="hint">{{ avito_field_hint('health_alert_browser_fallback_share_pct') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Ошибки отправки за 24 часа</span><input type="number" name="health_alert_send_errors_24h" min="1" max="1000" value="{{ avito_config.health_alert_send_errors_24h }}"><span class="hint">{{ avito_field_hint('health_alert_send_errors_24h') }}</span></label>
+        </div>
+        <div class="row">
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Просрочено по SLA</span><input type="number" name="health_alert_overdue_queue_count" min="1" max="1000" value="{{ avito_config.health_alert_overdue_queue_count }}"><span class="hint">{{ avito_field_hint('health_alert_overdue_queue_count') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Допустимый лаг poll-sync, сек</span><input type="number" name="health_alert_poll_lag_seconds" min="30" max="86400" value="{{ avito_config.health_alert_poll_lag_seconds }}"><span class="hint">{{ avito_field_hint('health_alert_poll_lag_seconds') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Открытых DLQ до тревоги</span><input type="number" name="health_alert_dlq_open_count" min="1" max="1000" value="{{ avito_config.health_alert_dlq_open_count }}"><span class="hint">{{ avito_field_hint('health_alert_dlq_open_count') }}</span></label>
+        </div>
+        <label class="field"><span class="field-label">Мин. попадание базы знаний, %</span><input type="number" step="0.1" name="health_alert_knowledge_hit_rate_min_pct" min="0" max="100" value="{{ avito_config.health_alert_knowledge_hit_rate_min_pct }}"><span class="hint">{{ avito_field_hint('health_alert_knowledge_hit_rate_min_pct') }}</span></label>
+        <div style="font-weight:700;margin-top:6px;">Роли доступа</div>
+        <label class="field"><span class="field-label">Кто может просматривать модуль</span><input type="text" name="rbac_view_users" value="{{ avito_config.rbac_view_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_view_users') }}</span></label>
+        <label class="field"><span class="field-label">Кто может отвечать вручную</span><input type="text" name="rbac_reply_users" value="{{ avito_config.rbac_reply_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_reply_users') }}</span></label>
+        <label class="field"><span class="field-label">Кто может массово отправлять</span><input type="text" name="rbac_bulk_send_users" value="{{ avito_config.rbac_bulk_send_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_bulk_send_users') }}</span></label>
+        <label class="field"><span class="field-label">Кто может менять правила ИИ</span><input type="text" name="rbac_ai_rules_users" value="{{ avito_config.rbac_ai_rules_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_ai_rules_users') }}</span></label>
+        <label class="field"><span class="field-label">Кто может менять подключение</span><input type="text" name="rbac_connect_users" value="{{ avito_config.rbac_connect_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_connect_users') }}</span></label>
+        <label class="field"><span class="field-label">Кто видит секреты без маски</span><input type="text" name="rbac_secret_users" value="{{ avito_config.rbac_secret_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_secret_users') }}</span></label>
+        <label class="field"><span class="field-label">Администраторы модуля</span><input type="text" name="rbac_admin_users" value="{{ avito_config.rbac_admin_users | join(', ') }}"><span class="hint">{{ avito_field_hint('rbac_admin_users') }}</span></label>
+
+        <div style="font-weight:700;margin-top:6px;">Ограничения загрузок и внешних ссылок</div>
+        <label class="field"><span class="field-label">Разрешить серверу скачивать внешние файлы по URL</span><input type="checkbox" name="media_allow_external_fetch" {% if avito_config.get("media_allow_external_fetch") %}checked{% endif %}><span class="hint">{{ avito_field_hint('media_allow_external_fetch') }}</span></label>
+        <label class="field"><span class="field-label">Разрешённые внешние домены</span><input type="text" name="media_allowed_external_hosts" value="{{ avito_config.get("media_allowed_external_hosts", []) | join(', ') }}"><span class="hint">{{ avito_field_hint('media_allowed_external_hosts') }}</span></label>
+        <div class="row">
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Лимит загрузки медиа, байт</span><input type="number" name="media_upload_max_bytes" min="1024" max="209715200" value="{{ avito_config.get("media_upload_max_bytes", 20971520) }}"><span class="hint">{{ avito_field_hint('media_upload_max_bytes') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Лимит скачивания внешнего файла, байт</span><input type="number" name="media_download_max_bytes" min="1024" max="209715200" value="{{ avito_config.get("media_download_max_bytes", 10485760) }}"><span class="hint">{{ avito_field_hint('media_download_max_bytes') }}</span></label>
+          <label class="field" style="flex:1;min-width:180px;"><span class="field-label">Лимит импорта базы знаний, байт</span><input type="number" name="knowledge_upload_max_bytes" min="1024" max="104857600" value="{{ avito_config.get("knowledge_upload_max_bytes", 5242880) }}"><span class="hint">{{ avito_field_hint('knowledge_upload_max_bytes') }}</span></label>
+        </div>
+        <label class="field"><span class="field-label">Разрешённые MIME-типы медиа</span><input type="text" name="media_allowed_mime_types" value="{{ avito_config.get("media_allowed_mime_types", []) | join(', ') }}"><span class="hint">{{ avito_field_hint('media_allowed_mime_types') }}</span></label>
+        <label class="field"><span class="field-label">Разрешённые MIME-типы базы знаний</span><input type="text" name="knowledge_allowed_mime_types" value="{{ avito_config.get("knowledge_allowed_mime_types", []) | join(', ') }}"><span class="hint">{{ avito_field_hint('knowledge_allowed_mime_types') }}</span></label>
+
+        <button type="submit">Сохранить настройки безопасности</button>
       </form>
       {% else %}
-        <div class="muted">Нет прав на изменение security-настроек.</div>
+        <div class="muted">Нет прав на изменение настроек безопасности.</div>
       {% endif %}
     </div>
   </div>

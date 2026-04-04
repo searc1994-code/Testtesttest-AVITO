@@ -2,56 +2,55 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>HITL очередь Avito</title>
+  <title>Очередь ручной проверки Avito</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
-    .wrap { max-width:1360px; margin:0 auto; padding:20px; }
+    .wrap { max-width:1280px; margin:0 auto; padding:20px; }
     .bar,.panel,.card { background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(15,23,42,.06); }
     .bar { padding:16px 18px; margin-bottom:16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
     .panel,.card { padding:16px; }
     .stack { display:grid; gap:12px; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .muted { color:#64748b; font-size:13px; }
-    .pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:12px; background:#e2e8f0; color:#0f172a; }
-    .pill.ok { background:#dcfce7; color:#166534; }
-    .pill.warn { background:#fef3c7; color:#92400e; }
-    .pill.err { background:#fee2e2; color:#991b1b; }
-    input, textarea, select { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    input, textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font:inherit; }
     button { border:0; background:#2563eb; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font:inherit; }
     button.ghost { background:#fff; color:#1f2937; border:1px solid #cbd5e1; }
     button.warn { background:#d97706; }
     button.err { background:#b91c1c; }
-    .flash { margin:8px 0; padding:10px 12px; border-radius:10px; background:#eef2ff; }
-    pre { white-space:pre-wrap; background:#0f172a; color:#e2e8f0; padding:12px; border-radius:12px; overflow:auto; }
+    .pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:12px; background:#e2e8f0; }
+    .pill.ok { background:#dcfce7; color:#166534; }
+    .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="bar">
     <div>
-      <div style="font-size:22px;font-weight:700;">HITL очередь Avito</div>
+      <div style="font-size:22px;font-weight:700;">Очередь ручной проверки Avito</div>
       <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
-      <div class="muted">Review={{ avito_metrics.review_queue_count }} · Hold={{ avito_metrics.hold_queue_count }} · Ready={{ avito_metrics.approved_queue_count }}</div>
+      <div class="muted">На проверке: {{ avito_metrics.review_queue_count }} · Отложено: {{ avito_metrics.hold_queue_count }} · Готово к отправке: {{ avito_metrics.approved_queue_count }}</div>
     </div>
     <div class="row">
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
-      <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Логи</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
+      <a href="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}">Журнал</a>
       <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
-        <div class="flash">{{ message }}</div>
+        <div class="panel" style="margin-bottom:12px;">{{ message }}</div>
       {% endfor %}
     {% endif %}
   {% endwith %}
 
   <div class="panel" style="margin-bottom:16px;">
     <form method="get" action="{{ url_for('avito_module.avito_queue', tenant_id=active_tenant_id) }}" class="row">
-      <label style="flex:1;min-width:280px;">Состояния
+      <label style="flex:1;min-width:280px;">Показывать состояния
         <input type="text" name="states" value="{{ queue_states | join(',') }}" placeholder="review,hold,error">
       </label>
       <button type="submit" class="ghost">Показать</button>
@@ -66,63 +65,46 @@
         <div class="row" style="justify-content:space-between;align-items:flex-start;">
           <div>
             <div style="font-weight:700;">{{ chat.client_name or chat.title or item.chat_id }}</div>
-            <div class="muted">{{ chat.item_title or chat.item_id or 'Без привязки к объявлению' }} · chat={{ item.chat_id }}</div>
-            <div class="muted">route={{ item.route }} · confidence={{ item.confidence }} · reason={{ item.reason or '—' }}</div>
-            <div class="muted">state={{ item.state }}{% if meta.get('reviewer') %} · reviewer={{ meta.get('reviewer') }}{% endif %}{% if meta.get('review_note') %} · note={{ meta.get('review_note') }}{% endif %}</div>
+            <div class="muted">Товар: {{ chat.item_title or chat.item_id or 'Без привязки к объявлению' }} · Чат: {{ item.chat_id }}</div>
+            <div class="muted">Маршрут: {{ avito_option_label('route', item.route) }} · Уверенность: {{ item.confidence }} · Причина: {{ item.reason or '—' }}</div>
+            <div class="muted">Состояние: {{ avito_option_label('draft_state', item.state) }}{% if meta.get('reviewer') %} · Проверил: {{ meta.get('reviewer') }}{% endif %}{% if meta.get('review_note') %} · Комментарий: {{ meta.get('review_note') }}{% endif %}</div>
           </div>
           <div class="row">
-            <span class="pill {% if item.state == 'ready' %}ok{% elif item.state in ['review','hold'] %}warn{% elif item.state == 'error' %}err{% endif %}">{{ item.state }}</span>
-            {% if meta.get('blocked_by') %}<span class="pill err">blocked {{ meta.get('blocked_by') }}</span>{% endif %}
-            {% if meta.get('policy') %}<span class="pill">{{ meta.get('policy') }}</span>{% endif %}
+            <span class="pill {% if item.state == 'ready' %}ok{% elif item.state in ['review','hold'] %}warn{% elif item.state == 'error' %}err{% endif %}">{{ avito_option_label('draft_state', item.state) }}</span>
             <a href="{{ url_for('avito_module.avito_chat', tenant_id=active_tenant_id, chat_id=item.chat_id) }}"><button type="button" class="ghost">Открыть чат</button></a>
           </div>
         </div>
 
-        <div style="margin-top:12px;">
-          <div style="font-weight:700;margin-bottom:6px;">Черновик</div>
-          <pre>{{ item.body or '—' }}</pre>
-        </div>
+        <div style="margin-top:12px;white-space:pre-wrap;">{{ item.body }}</div>
 
-        {% if meta.similar_dialogs %}
-          <div style="margin-top:12px;">
-            <div style="font-weight:700;margin-bottom:6px;">Похожие диалоги</div>
-            {% for sample in meta.similar_dialogs[:3] %}
-              <div class="muted">#{{ sample.chat_id }} · score={{ sample.score }} · {{ sample.excerpt or sample.latest_in_text or '—' }}</div>
-            {% endfor %}
-          </div>
+        {% if meta.get('similar_dialogs') %}
+          <div style="margin-top:12px; font-weight:700;">Похожие диалоги</div>
+          {% for sample in meta.get('similar_dialogs', [])[:3] %}
+            <div class="muted">#{{ sample.chat_id }} · похожесть: {{ sample.score }} · {{ sample.excerpt or sample.latest_in_text or '—' }}</div>
+          {% endfor %}
         {% endif %}
 
         {% if avito_permissions.reply %}
-          <div style="margin-top:14px;display:grid;gap:12px;">
-            <form method="post" action="{{ url_for('avito_module.avito_draft_approve', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" style="display:grid;gap:10px;">
-              <label>Текст перед одобрением
-                <textarea name="body" rows="5">{{ item.body or '' }}</textarea>
-              </label>
-              <div class="row">
-                <label style="flex:1;min-width:240px;">Комментарий ревью
-                  <input type="text" name="review_note" placeholder="Например: проверено менеджером">
-                </label>
-                <label class="muted" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="send_now" value="1"> отправить сразу</label>
-                <button type="submit">Одобрить</button>
-              </div>
-            </form>
-
+        <div class="row" style="margin-top:14px;align-items:flex-start;">
+          <form method="post" action="{{ url_for('avito_module.avito_draft_approve', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" style="display:grid;gap:10px;flex:2;min-width:320px;">
+            <textarea name="body" rows="5">{{ item.body }}</textarea>
             <div class="row">
-              <form method="post" action="{{ url_for('avito_module.avito_draft_hold', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <input type="text" name="review_note" placeholder="Почему hold" style="width:260px;">
-                <button type="submit" class="warn">Отложить</button>
-              </form>
-              <form method="post" action="{{ url_for('avito_module.avito_draft_reject', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <input type="text" name="review_note" placeholder="Почему отклонён" style="width:260px;">
-                <button type="submit" class="err">Отклонить</button>
-              </form>
-              {% if avito_permissions.ai_rules %}
-              <form method="post" action="{{ url_for('avito_module.avito_draft_regenerate', tenant_id=active_tenant_id, chat_id=item.chat_id) }}">
-                <button type="submit" class="ghost">Перегенерировать</button>
-              </form>
-              {% endif %}
+              <input type="text" name="review_note" placeholder="Комментарий проверки" style="flex:1;min-width:180px;">
+              <label class="muted" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="send_now" value="1"> отправить сразу</label>
+              <button type="submit">Одобрить</button>
             </div>
+          </form>
+          <div style="display:grid;gap:10px;flex:1;min-width:240px;">
+            <form method="post" action="{{ url_for('avito_module.avito_draft_hold', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" class="row">
+              <input type="text" name="review_note" placeholder="Почему отложено">
+              <button type="submit" class="warn">Отложить</button>
+            </form>
+            <form method="post" action="{{ url_for('avito_module.avito_draft_reject', tenant_id=active_tenant_id, chat_id=item.chat_id) }}" class="row">
+              <input type="text" name="review_note" placeholder="Почему отклонено">
+              <button type="submit" class="err">Отклонить</button>
+            </form>
           </div>
+        </div>
         {% endif %}
       </div>
     {% else %}

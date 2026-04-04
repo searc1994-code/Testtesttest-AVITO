@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <title>Логи Avito</title>
+  <title>Журнал Avito</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f6f7fb; color:#1f2937; }
@@ -31,36 +31,39 @@
   </style>
 </head>
 <body>
+{% set run_status_labels = {"completed":"завершён", "warning":"с предупреждением", "running":"выполняется", "failed":"ошибка", "error":"ошибка", "abandoned":"прерван", "unknown":"неизвестно"} %}
+{% set channel_labels = {"sync":"синхронизация", "ai":"ИИ", "send":"отправка", "browser":"браузер", "webhook":"вебхук", "ui":"интерфейс", "ops":"операции", "decision":"решения", "security":"безопасность", "knowledge":"база знаний", "media":"медиа", "health":"здоровье"} %}
 <div class="wrap">
   <div class="bar">
     <div>
-      <div style="font-size:22px;font-weight:700;">Логи Avito</div>
+      <div style="font-size:22px;font-weight:700;">Журнал Avito</div>
       <div class="muted">Кабинет: {{ active_tenant.name if active_tenant else active_tenant_id }}</div>
       <div class="muted">Папка логов: <code>{{ avito_logs_root }}</code></div>
     </div>
     <div class="row">
-      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← К inbox</a>
+      <a href="{{ url_for('avito_module.avito_index', tenant_id=active_tenant_id) }}">← Ко входящим</a>
       <a href="{{ url_for('avito_module.avito_settings', tenant_id=active_tenant_id) }}">Настройки</a>
-      <a href="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}">DLQ</a>
+      <a href="{{ url_for('avito_module.avito_dlq', tenant_id=active_tenant_id) }}">Очередь ошибок</a>
+      <a href="{{ url_for('avito_module.avito_health', tenant_id=active_tenant_id) }}">Здоровье</a>
     </div>
   </div>
 
   <div class="panel" style="margin-bottom:16px;">
     <div class="row">
-      <span class="pill">incoming 60m: {{ avito_metrics.incoming_60m }}</span>
-      <span class="pill">auto: {{ avito_metrics.auto_reply_share }}%</span>
-      <span class="pill">escalation: {{ avito_metrics.escalation_share }}%</span>
-      <span class="pill">refresh: {{ avito_metrics.token_refresh_events_60m }}</span>
-      <span class="pill">webhook fail 24h: {{ avito_metrics.webhook_verify_fail_pct_24h }}%</span>
+      <span class="pill">Входящих за 60 мин: {{ avito_metrics.incoming_60m }}</span>
+      <span class="pill">Доля автоответов: {{ avito_metrics.auto_reply_share }}%</span>
+      <span class="pill">Доля эскалаций: {{ avito_metrics.escalation_share }}%</span>
+      <span class="pill">Обновлений токена: {{ avito_metrics.token_refresh_events_60m }}</span>
+      <span class="pill">Ошибок проверки webhook за 24 ч: {{ avito_metrics.webhook_verify_fail_pct_24h }}%</span>
     </div>
   </div>
 
   <div class="grid">
     <div class="panel">
-      <div style="font-weight:700;margin-bottom:12px;">Последние run-логи</div>
+      <div style="font-weight:700;margin-bottom:12px;">Последние запуски</div>
       {% if runs %}
         <table>
-          <thead><tr><th>Run</th><th>Статус</th></tr></thead>
+          <thead><tr><th>Запуск</th><th>Статус</th></tr></thead>
           <tbody>
           {% for run in runs %}
             <tr>
@@ -70,7 +73,7 @@
                 <div class="muted">{{ run.updated_at or run.created_at }}</div>
               </td>
               <td>
-                <span class="pill {% if run.status == 'completed' %}ok{% elif run.status in ['warning', 'abandoned'] %}warn{% elif run.status == 'error' %}err{% endif %}">{{ run.status }}</span>
+                <span class="pill {% if run.status == 'completed' %}ok{% elif run.status in ['warning', 'abandoned'] %}warn{% elif run.status == 'error' %}err{% endif %}">{{ run_status_labels.get(run.status, run.status or 'неизвестно') }}</span>
                 <div class="muted">{{ run.last_stage or '—' }}</div>
               </td>
             </tr>
@@ -78,83 +81,74 @@
           </tbody>
         </table>
       {% else %}
-        <div class="muted">Run-логи пока не появились.</div>
+        <div class="muted">Запусков пока нет.</div>
       {% endif %}
     </div>
 
-    <div style="display:grid; gap:16px;">
-      <div class="panel">
-        <div style="font-weight:700;margin-bottom:12px;">Сводка по выбранному run</div>
-        {% if selected_run %}
-          <div class="row" style="margin-bottom:8px;">
-            <span class="pill {% if selected_run.status == 'completed' %}ok{% elif selected_run.status in ['warning', 'abandoned'] %}warn{% elif selected_run.status == 'error' %}err{% endif %}">{{ selected_run.status }}</span>
-            <strong>{{ selected_run.kind }}</strong>
-            <span class="muted">{{ selected_run.run_id }}</span>
-          </div>
-          <div class="muted">Создан: {{ selected_run.created_at or '—' }} · Завершён: {{ selected_run.finished_at or '—' }}</div>
-          <div class="muted">Последний шаг: {{ selected_run.last_stage or '—' }} · {{ selected_run.last_message or '—' }}</div>
-          {% if selected_run.summary %}
-            <pre style="white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:12px;overflow:auto;">{{ selected_run.summary | tojson(indent=2) }}</pre>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <div style="font-weight:700;">Детали запуска</div>
+          {% if selected_run %}
+            <div class="muted">{{ selected_run.kind }} · {{ selected_run.run_id }}</div>
           {% endif %}
-        {% else %}
-          <div class="muted">Выбери run слева, чтобы посмотреть подробности.</div>
-        {% endif %}
-      </div>
-
-      <div class="panel">
-        <div style="font-weight:700;margin-bottom:12px;">Таймлайн выбранного run</div>
-        {% if selected_run_events %}
-          <div class="timeline">
-            {% for event in selected_run_events %}
-              <div class="event {{ event.level or 'info' }}">
-                <div class="row">
-                  <strong>{{ event.stage }}</strong>
-                  {% if event.percent is defined %}<span class="pill">{{ event.percent }}%</span>{% endif %}
-                  <span class="muted">{{ event.ts }}</span>
-                  <span class="muted">{{ event.channel }}</span>
-                </div>
-                <div style="margin-top:6px; white-space:pre-wrap;">{{ event.message or '—' }}</div>
-                {% if event.data %}
-                  <pre style="white-space:pre-wrap;background:#f1f5f9;padding:10px;border-radius:10px;overflow:auto;margin-top:8px;">{{ event.data | tojson(indent=2) }}</pre>
-                {% endif %}
-              </div>
+        </div>
+        <form method="get" action="{{ url_for('avito_module.avito_logs', tenant_id=active_tenant_id) }}" class="row">
+          {% if selected_run %}<input type="hidden" name="run_id" value="{{ selected_run.run_id }}">{% endif %}
+          <select name="channel">
+            {% for value in available_channels %}
+              <option value="{{ value }}" {% if selected_channel == value %}selected{% endif %}>{{ channel_labels.get(value, value) }}</option>
             {% endfor %}
-          </div>
-        {% else %}
-          <div class="muted">Для выбранного run нет событий.</div>
-        {% endif %}
-      </div>
-
-      <div class="panel">
-        <div style="font-weight:700;margin-bottom:12px;">Хвост channel-логов</div>
-        <form method="get" class="row" style="margin-bottom:12px;">
-          {% if selected_run.run_id %}<input type="hidden" name="run_id" value="{{ selected_run.run_id }}">{% endif %}
-          <label>Канал
-            <select name="channel">
-              {% for channel in available_channels %}
-                <option value="{{ channel }}" {% if channel == selected_channel %}selected{% endif %}>{{ channel }}</option>
-              {% endfor %}
-            </select>
-          </label>
+          </select>
           <button type="submit">Показать</button>
         </form>
-        {% if channel_events %}
-          <div class="timeline">
-            {% for event in channel_events %}
-              <div class="event {{ event.level or 'info' }}">
-                <div class="row">
-                  <strong>{{ event.stage }}</strong>
-                  {% if event.run_id %}<span class="muted">run={{ event.run_id }}</span>{% endif %}
-                  <span class="muted">{{ event.ts }}</span>
-                </div>
-                <div style="margin-top:6px; white-space:pre-wrap;">{{ event.message or '—' }}</div>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="muted">По каналу {{ selected_channel }} событий пока нет.</div>
-        {% endif %}
       </div>
+
+      {% if selected_run %}
+        <div class="row" style="margin-bottom:12px;">
+          <span class="pill {% if selected_run.status == 'completed' %}ok{% elif selected_run.status in ['warning','abandoned'] %}warn{% elif selected_run.status == 'error' %}err{% endif %}">{{ run_status_labels.get(selected_run.status, selected_run.status or 'неизвестно') }}</span>
+          <span class="pill">Этап: {{ selected_run.last_stage or '—' }}</span>
+          <span class="pill">Шагов: {{ selected_run.steps_count or 0 }}</span>
+          <span class="pill">Длительность: {{ selected_run.duration_ms or 0 }} мс</span>
+        </div>
+        {% if selected_run.summary %}
+          <details style="margin-bottom:12px;">
+            <summary class="muted">Сводка запуска</summary>
+            <pre>{{ selected_run.summary | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+      {% endif %}
+
+      {% if selected_run_events %}
+        <div class="timeline">
+          {% for event in selected_run_events %}
+            <div class="event {{ event.level or 'info' }}">
+              <div class="row" style="justify-content:space-between;align-items:center;">
+                <strong>{{ event.stage }}</strong>
+                <span class="muted">{{ event.ts }}</span>
+              </div>
+              <div style="margin-top:6px;">{{ event.message or '—' }}</div>
+              <div class="muted" style="margin-top:6px;">Канал: {{ event.channel or '—' }}{% if event.percent is not none %} · Прогресс: {{ event.percent }}%{% endif %}</div>
+              {% if event.data %}<pre>{{ event.data | tojson(indent=2) }}</pre>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% elif channel_events %}
+        <div class="timeline">
+          {% for event in channel_events %}
+            <div class="event {{ event.level or 'info' }}">
+              <div class="row" style="justify-content:space-between;align-items:center;">
+                <strong>{{ event.stage }}</strong>
+                <span class="muted">{{ event.ts }}</span>
+              </div>
+              <div style="margin-top:6px;">{{ event.message or '—' }}</div>
+              {% if event.run_id %}<div class="muted" style="margin-top:6px;">ID запуска: {{ event.run_id }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">Событий по выбранному фильтру пока нет.</div>
+      {% endif %}
     </div>
   </div>
 </div>

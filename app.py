@@ -203,6 +203,23 @@ def _temporary_tenant_binding(tenant_id: str):
         g.active_tenant_id = previous_tenant_id
 
 
+
+
+def _safe_query_for_log(path: str) -> dict:
+    try:
+        if clean_text(path).startswith('/avito/webhook'):
+            return {}
+        redacted = {}
+        for key, value in request.args.items():
+            k = clean_text(key).lower()
+            if any(token in k for token in ('token', 'secret', 'signature', 'sig', 'nonce')):
+                redacted[key] = '[REDACTED]'
+            else:
+                redacted[key] = clean_text(value)
+        return redacted
+    except Exception:
+        return {}
+
 @app.after_request
 def _safe_request_logger(response):
     try:
@@ -221,7 +238,7 @@ def _safe_request_logger(response):
                     endpoint=request.endpoint or '',
                     status_code=getattr(response, 'status_code', 0),
                     duration_ms=duration_ms,
-                    query=dict(request.args),
+                    query=_safe_query_for_log(path),
                     user=_current_user_for_logs(),
                 )
     except Exception:
